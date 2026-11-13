@@ -188,6 +188,8 @@ class Preferences(QDialog):
             category = item.get("category")
             setting_type = item.get("type")
             sort_type = item.get("sort")
+            if item.get("setting") == "send_metrics" and not info.UPSTREAM_SERVICES:
+                continue
 
             if setting_type != "hidden":
                 # Load setting

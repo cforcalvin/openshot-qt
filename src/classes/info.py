@@ -30,11 +30,12 @@ import sys
 import tempfile
 from time import strftime
 
+from classes.branding import PRODUCT_NAME, UPSTREAM_SERVICES, USER_DIR_NAME, rebrand  # noqa: F401
+
 VERSION = "4.2.0-dev1"
 MINIMUM_LIBOPENSHOT_VERSION = "1.2.0"
 DATE = "20261104000000"
 NAME = "openshot-qt"
-PRODUCT_NAME = "OpenShot Video Editor"
 GPL_VERSION = "3"
 DESCRIPTION = "Create and edit stunning videos, films, and animations with an " \
               "easy-to-use interface and rich set of features."
@@ -56,7 +57,7 @@ COLORS_PATH = os.path.join(PATH, "colors")
 
 # User paths
 HOME_PATH = os.path.join(os.path.expanduser("~"))
-USER_PATH = os.path.join(HOME_PATH, ".openshot_qt")
+USER_PATH = os.path.join(HOME_PATH, USER_DIR_NAME)
 ASSETS_PATH = USER_PATH
 BACKUP_PATH = os.path.join(USER_PATH)
 RECOVERY_PATH = os.path.join(USER_PATH, "recovery")
@@ -240,7 +241,7 @@ SETUP = {
     "license": "GNU GPL v." + GPL_VERSION,
     "description": DESCRIPTION,
     "long_description": "Create and edit videos and movies\n"
-                        " OpenShot Video Editor is a free, open-source, non-linear video editor. It\n"
+                        " " + PRODUCT_NAME + " is a free, open-source, non-linear video editor. It\n"
                         " can create and edit videos and movies using many popular video, audio, \n"
                         " image formats.  Create videos for YouTube, Flickr, Vimeo, Metacafe, iPod,\n"
                         " Xbox, and many more common formats!\n"

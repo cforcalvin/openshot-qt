@@ -39,7 +39,7 @@ from windows.toggle_switch import ToggleSwitch
 from classes.logger import log
 from classes.app import get_app
 from classes.metrics import track_metric_screen
-from classes import sentry
+from classes import info, sentry
 
 
 class TutorialDialog(QWidget):
@@ -178,7 +178,7 @@ class TutorialDialog(QWidget):
         # Add error and anonymous metrics checkbox (for ID=0) tooltip
         # This is a bit of a hack, but since it's the only exception, it's
         # probably okay for now.
-        if self.widget_id == "0":
+        if self.widget_id == "0" and info.UPSTREAM_SERVICES:
             # Get settings
             s = get_app().get_settings()
 
@@ -480,7 +480,9 @@ class TutorialManager(QObject):
              "x": 0,
              "y": 0,
              "object_id": "dockVideo",
-             "text": _("<b>Welcome!</b> OpenShot Video Editor is an award-winning, open-source video editing application! This tutorial will walk you through the basics.<br><br>Would you like to automatically send errors and metrics to help improve OpenShot?"),
+             "text": (_("<b>Welcome!</b> OpenShot Video Editor is an award-winning, open-source video editing application! This tutorial will walk you through the basics.<br><br>Would you like to automatically send errors and metrics to help improve OpenShot?")
+                      if info.UPSTREAM_SERVICES else
+                      _("<b>Welcome!</b> %(product)s is an open-source video editing application, based on OpenShot Video Editor. This tutorial will walk you through the basics.") % {"product": info.PRODUCT_NAME}),
              "arrow": False
              },
             {"id": "1",

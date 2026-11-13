@@ -732,7 +732,7 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
         if not is_content_uri(file_path) and not re.search(
                 r"\.osp(?:\.bak(?:\.[0-9]+)?)?\Z", os.path.basename(file_path), re.IGNORECASE):
             if not interactive:
-                raise ValueError("Expected an OpenShot .osp project file")
+                raise ValueError("Expected a %s .osp project file" % info.PRODUCT_NAME)
             QMessageBox.warning(
                 self,
                 _("Invalid Project File"),
@@ -3886,7 +3886,7 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
             filename = os.path.splitext(filename)[0]
             # Use singleShot since this method can be invoked by our preview thread
             QTimer.singleShot(0, functools.partial(self.setWindowTitle,
-                "%s %s [%s] - %s" % (save_indicator, filename, profile, "OpenShot Video Editor")))
+                "%s %s [%s] - %s" % (save_indicator, filename, profile, info.PRODUCT_NAME)))
 
     # Update undo and redo buttons enabled/disabled to available changes
     def updateStatusChanged(self, undo_status, redo_status):

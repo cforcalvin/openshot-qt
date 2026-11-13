@@ -29,6 +29,7 @@ from qt_api import QtCore
 from qt_api import QColorDialog, QPushButton, QDialog, QFrame
 from qt_api import QColor, QPainter, QPen, QCursor
 from qt_api import Qt, QRect, QPoint
+from classes import info
 from classes.logger import log
 from classes.app import get_app
 
@@ -189,7 +190,7 @@ class PickingDialog(QDialog):
 
         # Get first pushbutton (color picker)
         color_picker_button = self.color_picker.findChildren(QPushButton)[0]
-        self.setWindowTitle(f"OpenShot: {color_picker_button.text().replace('&', '')}")
+        self.setWindowTitle(f"{info.PRODUCT_NAME}: {color_picker_button.text().replace('&', '')}")
 
     def paintEvent(self, event):
         painter = QPainter(self)

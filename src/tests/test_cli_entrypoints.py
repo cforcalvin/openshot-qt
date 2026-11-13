@@ -45,7 +45,7 @@ class CommonEntryTests(unittest.TestCase):
                 package = root / 'openshot_qt'
                 (package / 'classes' / 'agent').mkdir(parents=True)
                 (package / 'windows' / 'views' / 'timeline_backend').mkdir(parents=True)
-                for name in ('__init__.py', 'launch.py', 'cli.py', 'classes/__init__.py',
+                for name in ('__init__.py', 'launch.py', 'cli.py', 'classes/__init__.py', 'classes/branding.py',
                              'classes/cli_console.py', 'classes/windows_dlls.py', 'classes/easing.py', 'classes/agent/__init__.py', 'classes/agent/protocol.py',
                              'classes/look_presets.py', 'classes/color_presets.py', 'classes/film_grain_presets.py',
                              'windows/__init__.py', 'windows/views/__init__.py', 'windows/views/timeline_backend/__init__.py',

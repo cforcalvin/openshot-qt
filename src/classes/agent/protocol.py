@@ -44,7 +44,8 @@ class CommandError(Exception):
 
 
 def session_dir():
-    return Path(os.environ.get('OPENSHOT_SESSION_DIR', str(Path.home() / '.openshot_qt' / 'sessions')))
+    from classes import branding
+    return Path(os.environ.get('OPENSHOT_SESSION_DIR', str(Path.home() / branding.USER_DIR_NAME / 'sessions')))
 
 
 def parse_json(text):

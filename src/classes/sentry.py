@@ -50,6 +50,9 @@ last_event_message = None
 
 def init_tracing():
     """Init all Sentry tracing"""
+    if not info.UPSTREAM_SERVICES:
+        log.info("Error reporting is disabled for %s", info.PRODUCT_NAME)
+        return
     if not sdk:
         log.info('No sentry_sdk module detected (error reporting is disabled)')
         return

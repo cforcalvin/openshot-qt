@@ -59,6 +59,7 @@ ensure_app_state(app, DummySettings, extra_attrs={"window": types.SimpleNamespac
 from classes import metrics
 
 
+@patch("classes.info.UPSTREAM_SERVICES", True)
 class MetricsTests(unittest.TestCase):
     def setUp(self):
         metrics.s = DummySettings(send_metrics=True)

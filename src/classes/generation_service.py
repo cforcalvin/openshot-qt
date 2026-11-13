@@ -47,6 +47,8 @@ from classes.logger import log
 from classes.query import File
 from windows.generate import GenerateMediaDialog
 
+SOURCE_CONVERSION_FAILED = "{} could not convert this image into PNG for ComfyUI.".format(info.PRODUCT_NAME)
+
 
 RASTER_IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff", ".gif",
@@ -1052,7 +1054,7 @@ class GenerationService(QObject):
         try:
             source_path = self._prepare_generation_source_path(source_file, payload.get("template_id"))
         except Exception as ex:
-            return False, "OpenShot could not convert this image into PNG for ComfyUI.\n\n{}".format(ex)
+            return False, "{}\n\n{}".format(SOURCE_CONVERSION_FAILED, ex)
 
         reference_image_path = ""
         reference_image_file_id = str(payload.get("reference_image_file_id") or "").strip()
@@ -1112,8 +1114,8 @@ class GenerationService(QObject):
             msg = QMessageBox(self.win)
             msg.setWindowTitle("ComfyUI Unavailable")
             msg.setText(
-                "OpenShot could not connect to ComfyUI at:\n{}\n\n"
-                "Start ComfyUI or update the URL in Preferences > Experimental.".format(self.comfy_ui_url())
+                "{} could not connect to ComfyUI at:\n{}\n\n"
+                "Start ComfyUI or update the URL in Preferences > Experimental.".format(info.PRODUCT_NAME, self.comfy_ui_url())
             )
             msg.exec_()
             return
@@ -1160,7 +1162,7 @@ class GenerationService(QObject):
             if not ok:
                 if error_text == "Only one active generation is allowed per source file.":
                     QMessageBox.information(self.win, "Generation Already Active", error_text)
-                elif error_text.startswith("OpenShot could not convert this image into PNG for ComfyUI."):
+                elif error_text.startswith(SOURCE_CONVERSION_FAILED):
                     QMessageBox.warning(self.win, "Source Conversion Failed", error_text)
                 else:
                     QMessageBox.information(self.win, "Invalid Input", error_text)

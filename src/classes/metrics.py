@@ -168,6 +168,8 @@ def track_metric_session(is_start=True):
 def send_metric(event):
     """Send anonymous GA4 Measurement Protocol events over HTTP."""
     global metric_worker_active
+    if not info.UPSTREAM_SERVICES:
+        return
 
     # Add to queue and *maybe* send if the user allows it
     with metric_queue_lock:

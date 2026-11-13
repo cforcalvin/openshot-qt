@@ -28,7 +28,8 @@ assert QtWidgets.QApplication.instance() is None
                 ("6.10.0", 0.75, 0.75),
                 ("5.15.2", 1.5, 1.5)):
             with self.subTest(version=version, scale=requested), tempfile.TemporaryDirectory() as directory:
-                profile = Path(directory) / ".openshot_qt"
+                from classes import branding
+                profile = Path(directory) / branding.USER_DIR_NAME
                 profile.mkdir()
                 (profile / "openshot.settings").write_text(json.dumps([
                     {"setting": "ui-scale", "value": requested}]))
@@ -50,7 +51,7 @@ assert QtWidgets.QApplication.instance() is None
             (package / "classes").mkdir(parents=True)
             # Stage the real modules needed by --version, using setup.py's layout.
             for name in ("__init__.py", "launch.py", "qt_api.py",
-                         "classes/__init__.py", "classes/info.py", "classes/log_config.py",
+                         "classes/__init__.py", "classes/branding.py", "classes/info.py", "classes/log_config.py",
                          "classes/qt_bootstrap.py", "classes/windows_dlls.py"):
                 shutil.copy2(str(source / name), str(package / name))
 

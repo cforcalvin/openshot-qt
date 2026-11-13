@@ -175,7 +175,7 @@ def _download_file_once(url, output_path, progress_callback, timeout):
     scheme = validate_url_scheme(url)
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "OpenShot/{}".format(info.VERSION)},
+        headers={"User-Agent": "{}/{}".format(info.PRODUCT_NAME, info.VERSION)},
     )
     kwargs = {"timeout": sum(timeout) if isinstance(timeout, tuple) else timeout}
     if scheme == "https":

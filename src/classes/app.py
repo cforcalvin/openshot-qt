@@ -382,6 +382,11 @@ class OpenShotApp(QApplication):
     def _tr(self, message):
         return self.translate("", message)
 
+    def translate(self, context, source, *args):
+        """Translate, then apply the product name (ui_util re-translates loaded .ui text here too)."""
+        from classes import info
+        return info.rebrand(QApplication.translate(context, source, *args))
+
     @Slot()
     def cleanup(self):
         """aboutToQuit signal handler for application exit"""

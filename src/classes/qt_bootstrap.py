@@ -40,7 +40,8 @@ def configure_qt():
     scale = 1.0
     logger = logging.getLogger(__name__)
 
-    settings_path = os.path.join(os.path.expanduser("~/.openshot_qt"), "openshot.settings")
+    from classes import branding
+    settings_path = os.path.join(os.path.expanduser("~"), branding.USER_DIR_NAME, "openshot.settings")
 
     try:
         if os.path.exists(settings_path):

@@ -187,7 +187,11 @@ class About(QDialog):
         else:
             log.warn("No changelog files found, disabling button")
 
-        description_text = _("OpenShot Video Editor is an Award-Winning, Free, and<br> Open-Source Video Editor for Linux, Mac, Chrome OS, and Windows.")
+        if info.PRODUCT_NAME == "OpenShot Video Editor":
+            description_text = _("OpenShot Video Editor is an Award-Winning, Free, and<br> Open-Source Video Editor for Linux, Mac, Chrome OS, and Windows.")
+        else:
+            description_text = _("%(product)s is a Free and Open-Source Video Editor,<br> based on OpenShot Video Editor.") % {
+                "product": info.PRODUCT_NAME}
         copyright_text = _('Copyright &copy; %(begin_year)s-%(current_year)s') % {
             'begin_year': '2008',
             'current_year': str(datetime.datetime.today().year)
@@ -501,7 +505,7 @@ class About(QDialog):
 
     def build_version_info_markdown(self):
         """Return a compact markdown block with version, system, and performance info."""
-        lines = ["**OpenShot Version Info**"]
+        lines = [f"**{info.PRODUCT_NAME} Version Info**"]
 
         version_line = f"Version: {info.VERSION} | libopenshot: {openshot.OPENSHOT_VERSION_FULL}"
         lines.append(version_line)
@@ -696,6 +700,8 @@ class About(QDialog):
 
     def get_current_release(self):
         """Get the current version """
+        if not info.UPSTREAM_SERVICES:
+            return
         t = threading.Thread(target=self.get_release_from_http, daemon=True)
         t.start()
 

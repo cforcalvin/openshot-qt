@@ -117,8 +117,8 @@ mac:
     - VERSION=$(python3 src/launch.py -V)
     - echo -e "CI_PROJECT_NAME:$CI_PROJECT_NAME\nCI_COMMIT_REF_NAME:$CI_COMMIT_REF_NAME\nCI_COMMIT_SHA:$CI_COMMIT_SHA\nCI_JOB_ID:$CI_JOB_ID\nCI_PIPELINE_ID:$CI_PIPELINE_ID\nVERSION:$VERSION" > "build/install-x64/share/$CI_PROJECT_NAME.env"
     - git log $(git describe --tags --abbrev=0 @^)..@ --oneline --pretty=format:"- %C(auto,yellow)%h%C(auto,magenta)% %C(auto,blue)%>(12,trunc)%ad %C(auto,green)%<(25,trunc)%aN%C(auto,reset)%s%C(auto,red)% gD% D" --date=short > "build/install-x64/share/$CI_PROJECT_NAME.log"
-    - python3 -u freeze.py bdist_mac --git-branch=$CI_COMMIT_REF_NAME --iconfile=installer/openshot.icns --custom-info-plist=installer/Info.plist --bundle-name="OpenShot Video Editor" > build/freeze-mac.log 2>&1 || { tail -n 200 build/freeze-mac.log; exit 1; }
-    - python3 installer/check_hardware_package.py "build/OpenShot Video Editor.app/Contents/MacOS" --report build/mac-hardware-package.json
+    - python3 -u freeze.py bdist_mac --git-branch=$CI_COMMIT_REF_NAME --iconfile=installer/openshot.icns --custom-info-plist=installer/Info.plist --bundle-name="Videoka" > build/freeze-mac.log 2>&1 || { tail -n 200 build/freeze-mac.log; exit 1; }
+    - python3 installer/check_hardware_package.py "build/Videoka.app/Contents/MacOS" --report build/mac-hardware-package.json
     - python3 -u installer/build_server.py "$SLACK_TOKEN" "$GITHUB_USER" "$GITHUB_PASS" "False" "$CI_COMMIT_REF_NAME" "$MAC_PASSWORD"
   when: always
   except:
@@ -180,11 +180,11 @@ mac-arm64:
     - VERSION=$(python3 src/launch.py -V)
     - echo -e "CI_PROJECT_NAME:$CI_PROJECT_NAME\nCI_COMMIT_REF_NAME:$CI_COMMIT_REF_NAME\nCI_COMMIT_SHA:$CI_COMMIT_SHA\nCI_JOB_ID:$CI_JOB_ID\nCI_PIPELINE_ID:$CI_PIPELINE_ID\nVERSION:$VERSION" > "build/install-x64/share/$CI_PROJECT_NAME.env"
     - git log $(git describe --tags --abbrev=0 @^)..@ --oneline --pretty=format:"- %C(auto,yellow)%h%C(auto,magenta)% %C(auto,blue)%>(12,trunc)%ad %C(auto,green)%<(25,trunc)%aN%C(auto,reset)%s%C(auto,red)% gD% D" --date=short > "build/install-x64/share/$CI_PROJECT_NAME.log"
-    - python3 -u freeze.py bdist_mac --git-branch=$CI_COMMIT_REF_NAME --iconfile=installer/openshot.icns --custom-info-plist=installer/Info.plist --bundle-name="OpenShot Video Editor" > build/freeze-mac-arm64.log 2>&1 || { tail -n 200 build/freeze-mac-arm64.log; exit 1; }
+    - python3 -u freeze.py bdist_mac --git-branch=$CI_COMMIT_REF_NAME --iconfile=installer/openshot.icns --custom-info-plist=installer/Info.plist --bundle-name="Videoka" > build/freeze-mac-arm64.log 2>&1 || { tail -n 200 build/freeze-mac-arm64.log; exit 1; }
     - grep -E "^ERROR" build/freeze-mac-arm64.log || true
     - if grep -qE "^ERROR(. Framework not found|. Multiple bundled copies|!!!!)" build/freeze-mac-arm64.log; then echo "ERROR Qt framework relocation or minimum macOS check failed"; exit 1; fi
-    - python3 installer/check_mac_arch.py "build/OpenShot Video Editor.app" --report build/mac-arm64-arch.json
-    - python3 installer/check_hardware_package.py "build/OpenShot Video Editor.app/Contents/MacOS" --report build/mac-arm64-hardware-package.json
+    - python3 installer/check_mac_arch.py "build/Videoka.app" --report build/mac-arm64-arch.json
+    - python3 installer/check_hardware_package.py "build/Videoka.app/Contents/MacOS" --report build/mac-arm64-hardware-package.json
     - python3 -u installer/build_server.py "$SLACK_TOKEN" "$GITHUB_USER" "$GITHUB_PASS" "False" "$CI_COMMIT_REF_NAME" "$MAC_PASSWORD"
   # Manual and non-blocking until the Apple Silicon runner and libopenshot mac-arm64-builder artifacts exist
   when: manual

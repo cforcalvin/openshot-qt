@@ -634,13 +634,15 @@ class VideoWidgetTransformTests(unittest.TestCase):
         self.assertTrue(device["advanced"])
         self.assertEqual(device["value"], "CPU")
         self.assertLess(device_index, selector_index)
+        from classes import info
+        user_dir = os.path.basename(info.USER_PATH)
         self.assertTrue(efficient_sam["value"].endswith(
-            ".openshot_qt/yolo/efficient-sam-tiny-1024/image_segmentation_efficientsam_ti_2025april.onnx"))
-        self.assertTrue(cutie_key["value"].endswith(".openshot_qt/yolo/cutie-medium/cutie-encode-key-640x368.onnx"))
-        self.assertTrue(cutie_value["value"].endswith(".openshot_qt/yolo/cutie-medium/cutie-encode-value-640x368.onnx"))
+            user_dir + "/yolo/efficient-sam-tiny-1024/image_segmentation_efficientsam_ti_2025april.onnx"))
+        self.assertTrue(cutie_key["value"].endswith(user_dir + "/yolo/cutie-medium/cutie-encode-key-640x368.onnx"))
+        self.assertTrue(cutie_value["value"].endswith(user_dir + "/yolo/cutie-medium/cutie-encode-value-640x368.onnx"))
         self.assertTrue(cutie_readout["value"].endswith(
-            ".openshot_qt/yolo/cutie-medium/cutie-memory-readout-floatmask-valid-640x368-m6-topk30-opencv.onnx"))
-        self.assertTrue(cutie_decode["value"].endswith(".openshot_qt/yolo/cutie-medium/cutie-decode-640x368.onnx"))
+            user_dir + "/yolo/cutie-medium/cutie-memory-readout-floatmask-valid-640x368-m6-topk30-opencv.onnx"))
+        self.assertTrue(cutie_decode["value"].endswith(user_dir + "/yolo/cutie-medium/cutie-decode-640x368.onnx"))
         self.assertEqual(selector["type"], "object-mask-selection")
         self.assertEqual(selector["title"], "Select Points")
 

@@ -39,6 +39,7 @@ if not getattr(sys, "frozen", False):
 else:
     # Bytecode caches written inside a signed app bundle would invalidate its signature
     sys.dont_write_bytecode = True
+from classes import branding
 from classes.easing import easing_presets
 from classes.look_presets import LOOK_PRESETS
 from classes.agent.protocol import CommandError, cli_command, parse_json, records, session_dir
@@ -52,7 +53,7 @@ Workflow: inspect -> edit -> project save / export start.
 Getting oriented: intro. Command details: COMMAND help.
 """
 
-INTRO = """OpenShot: from footage to finished edit
+INTRO = branding.PRODUCT_NAME + """: from footage to finished edit
 
 Work in a persistent session
   Connect to an open editor or start a headless session.
@@ -289,7 +290,7 @@ def build_parser():
         description=(
             '  []  []  []  []  []  []  []  []\n'
             '  ----------------------------\n'
-            '     OpenShot Video Editor\n'
+            '  ' + branding.PRODUCT_NAME.center(28).rstrip() + '\n'
             '  Lights. Camera. Command line.\n'
             '  ----------------------------\n'
             '  []  []  []  []  []  []  []  []'),
@@ -336,7 +337,7 @@ def build_parser():
     p = command(s, 'open', 'Open an existing .osp without interactive missing-media dialogs.', 'project.open')
     p.add_argument('path', help='Existing project path.')
     p.add_argument('--discard', action='store_true', help='Allow replacement of unsaved edits.')
-    p = command(s, 'save', 'Save through the existing OpenShot project serializer.', 'project.save')
+    p = command(s, 'save', 'Save through the existing %s project serializer.' % branding.PRODUCT_NAME, 'project.save')
     p.add_argument('path', help='Destination .osp path (existing destination requires --overwrite).')
     p.add_argument('--overwrite', action='store_true', help='Allow replacing an existing project file.')
     p = command(s, 'collect', 'Save a portable copy with all referenced media in a new directory. Leaves the live project unchanged; history is omitted.', 'project.collect')
@@ -345,7 +346,7 @@ def build_parser():
     p = command(s, 'profile', 'Inspect or change the project profile. Changes share existing frame-rate conversion and undo/redo.')
     ps = p.add_subparsers(dest='profile_operation')
     command(ps, 'get', 'Return full current profile settings and exact installed matches.', 'project.profile.get')
-    p = command(ps, 'set', 'Set an installed or custom project profile, retiming existing clips/keyframes through OpenShot. One undo transaction.', 'project.profile.set')
+    p = command(ps, 'set', 'Set an installed or custom project profile, retiming existing clips/keyframes through %s. One undo transaction.' % branding.PRODUCT_NAME, 'project.profile.set')
     add_profile_selection(p, positional=True)
     p.add_argument('--width', type=int, help='Legacy exact installed-profile selector; also supply --height.')
     p.add_argument('--height', type=int, help='Height for legacy width/FPS selection.')
@@ -487,7 +488,7 @@ def build_parser():
     p.add_argument('--expect-revision', type=int, help='Reject if the selection/project has changed since preview.')
     p.add_argument('--dry-run', action='store_true', help='Validate the expanded batch without editing; return selected IDs and command count.')
     s = group('export', 'Inspect presets, validate settings, and export snapshots using the installed engine.')
-    p = command(s, 'preset', 'Browse existing OpenShot XML export presets; hardware availability depends on the installed engine and machine.')
+    p = command(s, 'preset', 'Browse existing %s XML export presets; hardware availability depends on the installed engine and machine.' % branding.PRODUCT_NAME)
     ps = p.add_subparsers(dest='preset_operation')
     p = command(ps, 'list', 'List export presets and codec availability. No session required.', 'export.preset.list')
     p.add_argument('--search', help='Filter preset ID/title/codec.')

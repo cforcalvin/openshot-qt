@@ -14,6 +14,7 @@ if PATH not in sys.path:
 from classes import info, release_details, sentry, version
 
 
+@patch("classes.info.UPSTREAM_SERVICES", True)
 class SentryReleaseTests(unittest.TestCase):
     def test_startup_classifies_before_sentry_initializes(self):
         rates = dict(openshot_version="4.0.1", error_rate_stable=0.1,

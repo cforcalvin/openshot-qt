@@ -33,6 +33,8 @@ from classes.logger import log
 
 def get_current_Version():
     """Get the current version """
+    if not info.UPSTREAM_SERVICES:
+        return
     t = threading.Thread(target=get_version_from_http, daemon=True)
     t.start()
 

@@ -23,8 +23,8 @@ VERSION=$(grep -E '^VERSION = "(.*)"' src/classes/info.py | awk '{print $3}' | t
 echo "Found Version $VERSION"
 
 # Set path to app bundle
-OS_APP_NAME="OpenShot Video Editor.app"
-OS_DMG_NAME="OpenShot-$VERSION.dmg"
+OS_APP_NAME="Videoka.app"
+OS_DMG_NAME="Videoka-$VERSION.dmg"
 OS_PATH="build/$OS_APP_NAME/Contents"
 echo "Fixing App Bundle ($OS_PATH)"
 

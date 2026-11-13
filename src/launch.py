@@ -98,7 +98,7 @@ def main():
     global app
 
     # Configure argument handling for commandline launches
-    parser = argparse.ArgumentParser(description='OpenShot version ' + info.SETUP['version'])
+    parser = argparse.ArgumentParser(description=info.PRODUCT_NAME + ' version ' + info.SETUP['version'])
     parser.add_argument(
         '--cli', action='store_true',
         help='Run automation commands instead of the editor. Must be the first argument: --cli help or --cli --help.')
@@ -109,7 +109,7 @@ def main():
     parser.add_argument(
         '--list-languages', dest='list_languages',
         action='store_true',
-        help='List all language codes supported by OpenShot')
+        help='List all language codes supported by ' + info.PRODUCT_NAME)
     parser.add_argument(
         '--path', dest='py_path', action='append',
         help='Additional locations to search for modules '
@@ -207,7 +207,7 @@ def main():
         app.show_errors()
 
     # Setup Qt application details
-    app.setApplicationName('openshot')
+    app.setApplicationName(info.PRODUCT_NAME.lower())
     app.setApplicationVersion(info.VERSION)
     try:
         # Qt 5.7+ only
