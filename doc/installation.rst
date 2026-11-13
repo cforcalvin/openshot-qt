@@ -71,9 +71,9 @@ Download the DMG file from the `official download page
 icon into your **Applications** shortcut. This is very similar to how most Mac applications are
 installed. Now launch OpenShot from `Launchpad` or `Applications` in Finder.
 
-The current Mac download is built for Intel Macs. On an Apple Silicon Mac, you
-can run this Intel version using Rosetta. A native Apple Silicon version is not
-currently available.
+There are two Mac downloads: **arm64** for Apple Silicon Macs (macOS 12 or newer), and **x86_64**
+for Intel Macs (macOS 10.15 or newer). To check which one you need, choose **About This Mac** from
+the Apple menu: Apple Silicon Macs list a **Chip** (such as Apple M1), and Intel Macs list a **Processor**.
 
 .. image:: images/mac-installer-dmg.jpg
 

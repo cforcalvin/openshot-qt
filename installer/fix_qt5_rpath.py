@@ -11,12 +11,16 @@ import shutil
 
 # Ignore non library/executable extensions
 non_executables = [".py", ".svg", ".png", ".blend", ".a", ".pak", ".qm", ".pyc", ".txt",
-                   ".jpg", ".zip", ".dat", ".conf", ".xml", ".h", ".ui", ".json", ".exe"]
+                   ".jpg", ".zip", ".dat", ".conf", ".xml", ".h", ".ui", ".json", ".exe",
+                   ".plist", ".xcprivacy"]
 
 # Dependency paths to bundle: @rpath, and Homebrew on Intel (/usr/local) and Apple Silicon (/opt/homebrew)
 relocate_dependency_paths = ["@rpath", "/usr/local", "/opt/homebrew"]
 
 CPU_TYPE_ARM64 = 0x0100000C
+
+# Framework binaries, such as "QtCore.framework/Versions/A/QtCore" (Qt 6 ships frameworks, not dylibs)
+FRAMEWORK_BINARY = re.compile(r"([^/]+)\.framework/Versions/[^/]+/\1$")
 
 
 def has_arm64_code(file_path):
@@ -47,12 +51,32 @@ def adhoc_sign(file_path):
             file_path, result.stdout.decode("utf-8", errors="replace").strip()))
 
 
-def fix_rpath(PATH):
+def find_framework_binaries(PATH):
+    """Map each framework binary suffix ("QtCore.framework/Versions/A/QtCore") to its bundled paths"""
+    frameworks = {}
+    for root, dirs, files in os.walk(PATH):
+        for basename in files:
+            file_path = os.path.join(root, basename)
+            match = FRAMEWORK_BINARY.search(file_path)
+            if match and not os.path.islink(file_path):
+                frameworks.setdefault(match.group(0), []).append(file_path)
+    return {suffix: sorted(paths) for suffix, paths in frameworks.items()}
+
+
+def fix_rpath(PATH, relocate_frameworks=None):
     """FIX broken @rpath on Qt, PyQt, and Homebrew dependencies with no @rpath"""
     # Cleanup duplicate folder and files (that cx_freeze creates)
     duplicate_path = os.path.join(PATH, "lib", "openshot_qt")
     if os.path.exists(duplicate_path):
         shutil.rmtree(duplicate_path)
+
+    # Apple Silicon builds use Qt 6 frameworks, which must resolve to the single bundled copy
+    if relocate_frameworks is None:
+        relocate_frameworks = platform.machine() == "arm64"
+    frameworks = find_framework_binaries(PATH) if relocate_frameworks else {}
+    for suffix, paths in frameworks.items():
+        if len(paths) > 1:
+            print("ERROR: Multiple bundled copies of %s: %s" % (suffix, ", ".join(paths)))
 
     # Find files matching patterns
     for root, dirs, files in os.walk(PATH):
@@ -82,7 +106,16 @@ def fix_rpath(PATH):
                    dependency_base_path, dependency_name = os.path.split(dependency_path)
 
                    # If @rpath or Homebrew found in dependency path, update with @executable_path instead
-                   if any(path in dependency_path for path in relocate_dependency_paths):
+                   framework = FRAMEWORK_BINARY.search(dependency_path) if relocate_frameworks else None
+                   if framework and any(path in dependency_path for path in relocate_dependency_paths):
+                       bundled_paths = frameworks.get(framework.group(0))
+                       if not bundled_paths:
+                           print("ERROR: Framework not found in EXE folder: %s" % dependency_path)
+                       else:
+                           dependency_exe_path = os.path.join(
+                               "@executable_path", os.path.relpath(bundled_paths[0], PATH))
+                           call(["install_name_tool", file_path, "-change", dependency_path, dependency_exe_path])
+                   elif any(path in dependency_path for path in relocate_dependency_paths):
                        dependency_exe_path = os.path.join("@executable_path", dependency_name)
                        if not os.path.exists(os.path.join(PATH, dependency_name)):
                            print("ERROR: Dependency PATH not found in EXE folder: %s" % dependency_path)
@@ -95,6 +128,20 @@ def fix_rpath(PATH):
                adhoc_sign(file_path)
 
 
+def normalize_version(version):
+    """Convert "12" or "12.0.1" into a comparable 3-part tuple"""
+    version_parts = tuple(int(part) for part in re.findall(r"\d+", version))
+    return version_parts + (0,) * max(0, 3 - len(version_parts))
+
+
+def min_supported_version():
+    """Oldest supported macOS: 10.15 on Intel. Apple Silicon builds use Qt 6.8, which requires
+    macOS 12.0 (override with MACOSX_DEPLOYMENT_TARGET when pinning a different Qt 6 release)."""
+    if platform.machine() != "arm64":
+        return (10, 15, 0)
+    return normalize_version(os.getenv("MACOSX_DEPLOYMENT_TARGET") or "12.0")
+
+
 def print_min_versions(PATH):
     """Print ALL MINIMUM and SDK VERSIONS for files in OpenShot build folder.
     This does not list all dependent libraries though, and sometimes one of those can cause issues."""
@@ -102,8 +149,7 @@ def print_min_versions(PATH):
     REGEX_SDK_MATCH = re.compile(r'.*(LC_VERSION_MIN_MACOSX).*version (\d+\.\d+).*sdk (\d+\.\d+).*(cmd)', re.DOTALL)
     REGEX_SDK_MATCH2 = re.compile(r'LC_BUILD_VERSION.*?minos\s+(\S+)\s+sdk\s+(\S+)', re.DOTALL)
 
-    # Oldest supported macOS: 10.15 on Intel, and 11.0 on Apple Silicon (the first arm64 release)
-    min_supported_version = (11, 0, 0) if platform.machine() == "arm64" else (10, 15, 0)
+    minimum_version = min_supported_version()
 
     VERSIONS = {}
 
@@ -117,7 +163,12 @@ def print_min_versions(PATH):
            if os.path.splitext(file_path)[-1] in non_executables or basename.startswith("."):
                continue
 
-           raw_output = subprocess.Popen(["otool", "-l", file_path], stdout=subprocess.PIPE).communicate()[0].decode('utf-8')
+           command = ["otool", "-l", file_path]
+           if platform.machine() == "arm64" and has_arm64_code(file_path):
+               # Universal binaries (e.g. cx_Freeze launchers) also contain an x86_64 slice with
+               # legacy load commands, which would be misreported as the arm64 minimum version
+               command = ["otool", "-arch", "arm64", "-l", file_path]
+           raw_output = subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0].decode('utf-8')
            matches = REGEX_SDK_MATCH.findall(raw_output)
            matches2 = REGEX_SDK_MATCH2.findall(raw_output)
            min_version = None
@@ -139,9 +190,7 @@ def print_min_versions(PATH):
                else:
                    VERSIONS[min_version] = [file_path]
 
-               version_parts = tuple(int(part) for part in re.findall(r"\d+", min_version))
-               normalized_version = version_parts + (0,) * max(0, 3 - len(version_parts))
-               if normalized_version > min_supported_version:
+               if normalize_version(min_version) > minimum_version:
                    print("ERROR!!!! Minimum OS X version not met for %s" % file_path)
 
     print("\nSummary of Minimum Mac SDKs for Dependencies:")

@@ -12,6 +12,12 @@ fi
 PATH="${BREW_PREFIX}/bin:${BREW_PREFIX}/sbin:/opt/local/bin:/opt/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin"
 MAC_NOTARIZE_PASSWORD=$1
 
+# Signing and notarization identity (defaults are the official OpenShot Studios credentials).
+# Set MAC_NOTARY_PROFILE to use credentials saved with `xcrun notarytool store-credentials`.
+MAC_SIGN_IDENTITY="${MAC_SIGN_IDENTITY:-Developer ID Application: OpenShot Studios, LLC (C94ZNQ5JF3)}"
+MAC_TEAM_ID="${MAC_TEAM_ID:-C94ZNQ5JF3}"
+MAC_APPLE_ID="${MAC_APPLE_ID:-jonathan@openshot.org}"
+
 # Get Version
 VERSION=$(grep -E '^VERSION = "(.*)"' src/classes/info.py | awk '{print $3}' | tr -d '"')
 echo "Found Version $VERSION"
@@ -27,10 +33,18 @@ cp installer/Info.plist "$OS_PATH"
 sed -e "s/VERSION/$VERSION/g" "$OS_PATH/Info.plist" > "$OS_PATH/Info.plist_version"
 mv  "$OS_PATH/Info.plist_version" "$OS_PATH/Info.plist"
 if [ "$(uname -m)" = "arm64" ]; then
-    echo "Setting minimum macOS version to 11.0 (first Apple Silicon release)"
-    plutil -replace LSMinimumSystemVersion -string "11.0" "$OS_PATH/Info.plist" || exit 1
+    # Apple Silicon builds use Qt 6.8, which requires macOS 12.0
+    MAC_MIN_VERSION="${MACOSX_DEPLOYMENT_TARGET:-12.0}"
+    echo "Setting minimum macOS version to $MAC_MIN_VERSION (Apple Silicon)"
+    plutil -replace LSMinimumSystemVersion -string "$MAC_MIN_VERSION" "$OS_PATH/Info.plist" || exit 1
 fi
 
+if [ -L "$OS_PATH/MacOS/lib" ]; then
+    # cx_Freeze 7+ already keeps code in Contents/MacOS and resources in Contents/Resources
+    # (MacOS/lib links to Resources/lib), and does not use the launch-mac wrapper.
+    echo "cx_Freeze 7+ bundle layout detected: using openshot-qt as the bundle executable"
+    plutil -replace CFBundleExecutable -string "openshot-qt" "$OS_PATH/Info.plist" || exit 1
+else
 echo "Symlink Non-Code Files to Resources"
 mv "$OS_PATH/MacOS/lib/blender" "$OS_PATH/Resources/blender"; ln -s "../../Resources/blender" "$OS_PATH/MacOS/lib/blender";
 mv "$OS_PATH/MacOS/lib/classes" "$OS_PATH/Resources/classes"; ln -s "../../Resources/classes" "$OS_PATH/MacOS/lib/classes";
@@ -55,15 +69,31 @@ mv "$OS_PATH/MacOS/lib/launch.py" "$OS_PATH/Resources/launch.py"; ln -s "../../R
 
 echo "Symlink lib folder into Resources - needed to find lib/babl-ext at runtime"
 ln -s "../MacOS/lib" "$OS_PATH/Resources/lib";
+fi
 
 echo "Fix permissions inside MacOS folder (all everyone to read and execute all the files inside this *.app bundle)"
 chmod -R a+rx "$OS_PATH/"*
 
 echo "Loop through bundled files and sign all binary files"
-find "build" \( -iname '*.dylib' -o -iname '*.so' \) -exec codesign -s "Developer ID Application: OpenShot Studios, LLC (C94ZNQ5JF3)" --timestamp=http://timestamp.apple.com/ts01 --entitlements "installer/openshot.entitlements" --force "{}" \;
+find "build" \( -iname '*.dylib' -o -iname '*.so' \) -exec codesign -s "$MAC_SIGN_IDENTITY" --timestamp=http://timestamp.apple.com/ts01 --entitlements "installer/openshot.entitlements" --force "{}" \;
+if [ "$(uname -m)" = "arm64" ]; then
+    # Python and Qt 6 libraries (framework binaries, or flattened copies such as lib/QtCore)
+    # have no file extension and live outside Contents/Frameworks, so codesign --deep
+    # does not reach them. Sign every remaining Mach-O file.
+    echo "Sign extensionless Mach-O binaries (Python, Qt)"
+    find "build/$OS_APP_NAME/Contents" -type f ! -name '*.dylib' ! -name '*.so' | while read -r binary; do
+        if file -b "$binary" | grep -q "Mach-O"; then
+            codesign -s "$MAC_SIGN_IDENTITY" --timestamp=http://timestamp.apple.com/ts01 --entitlements "installer/openshot.entitlements" --options runtime --force "$binary" || exit 1
+        fi
+    done || exit 1
+fi
 
 echo "Code Sign App Bundle (deep)"
-codesign -s "Developer ID Application: OpenShot Studios, LLC (C94ZNQ5JF3)" --force --deep --entitlements "installer/openshot.entitlements" --options runtime --timestamp=http://timestamp.apple.com/ts01 "build/$OS_APP_NAME"
+codesign -s "$MAC_SIGN_IDENTITY" --force --deep --entitlements "installer/openshot.entitlements" --options runtime --timestamp=http://timestamp.apple.com/ts01 "build/$OS_APP_NAME"
+if [ "$(uname -m)" = "arm64" ]; then
+    echo "Verifying nested code signatures (strict)"
+    codesign --verify --deep --strict --verbose=2 "build/$OS_APP_NAME" || exit 1
+fi
 echo "Verifying App Signing"
 spctl -a -vv "build/$OS_APP_NAME"
 
@@ -71,12 +101,16 @@ echo "Building Custom DMG"
 appdmg "installer/dmg-template.json" "build/$OS_DMG_NAME"
 
 echo "Code Sign DMG"
-codesign -s "Developer ID Application: OpenShot Studios, LLC (C94ZNQ5JF3)" --force --entitlements "installer/openshot.entitlements" --timestamp=http://timestamp.apple.com/ts01 "build/$OS_DMG_NAME"
+codesign -s "$MAC_SIGN_IDENTITY" --force --entitlements "installer/openshot.entitlements" --timestamp=http://timestamp.apple.com/ts01 "build/$OS_DMG_NAME"
 
 echo "Notarize DMG file (submit to Apple)"
 # No errors uploading '/Users/jonathan/builds/7d5103a1/0/OpenShot/openshot-qt/build/test.zip'.
 # RequestUUID = cc285719-823f-4f0b-8e71-2df4bbbdaf72
-notarize_output=$(xcrun notarytool submit --apple-id "jonathan@openshot.org" --password "$MAC_NOTARIZE_PASSWORD" --team-id "C94ZNQ5JF3" --wait "build/$OS_DMG_NAME")
+if [ -n "$MAC_NOTARY_PROFILE" ]; then
+    notarize_output=$(xcrun notarytool submit --keychain-profile "$MAC_NOTARY_PROFILE" --wait "build/$OS_DMG_NAME")
+else
+    notarize_output=$(xcrun notarytool submit --apple-id "$MAC_APPLE_ID" --password "$MAC_NOTARIZE_PASSWORD" --team-id "$MAC_TEAM_ID" --wait "build/$OS_DMG_NAME")
+fi
 echo "$notarize_output"
 
 echo "Parse Notarize Output and get Notarization ID & Status"

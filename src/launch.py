@@ -44,6 +44,11 @@ import sys
 import os
 import argparse
 
+# Frozen apps load some modules from source; writing their bytecode caches inside a
+# signed app bundle would invalidate its code signature.
+if getattr(sys, "frozen", False):
+    sys.dont_write_bytecode = True
+
 # Configure native dependencies before GUI or CLI imports.
 if __package__:
     from .classes.windows_dlls import configure_windows_dll_paths

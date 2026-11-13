@@ -9,12 +9,14 @@ to concrete paths before freeze starts.
 import argparse
 import glob
 import os
+import platform
 import shutil
 import subprocess  # nosec B404 - macOS packaging uses fixed local tooling.
 import sys
 
 
 ALLOWED_COMMANDS = {
+    "codesign": "/usr/bin/codesign",
     "install_name_tool": "/usr/bin/install_name_tool",
     "otool": "/usr/bin/otool",
 }
@@ -53,6 +55,14 @@ def otool_dependencies(path):
     return dependencies
 
 
+def install_name(path):
+    """Return the install name (LC_ID_DYLIB) of a dylib."""
+    command = validate_tool_command(["otool", "-D", os.path.abspath(path)])
+    output = subprocess.check_output(command, text=True)  # nosec B603 - fixed executable, validated path, no shell.
+    lines = [line.strip() for line in output.splitlines()[1:] if line.strip()]
+    return lines[0] if lines else path
+
+
 def opencv_rpath_dependencies(path):
     return [
         dependency
@@ -73,8 +83,16 @@ def stage_opencv_dylibs(opencv_root, stage_dir):
     if not dylibs:
         raise FileNotFoundError(f"No OpenCV dylibs found in: {opencv_lib_dir}")
 
-    for dylib in dylibs:
-        staged = os.path.join(stage_dir, os.path.basename(dylib))
+    if platform.machine() == "arm64":
+        # Copying every symlinked name (libopencv_core.dylib, .413.dylib, .4.13.0.dylib) bundles
+        # duplicate libraries which then all load (duplicate ObjC classes); stage one copy per
+        # library, named by its install name, which is what OpenShot links against.
+        dylibs = [(dylib, os.path.basename(install_name(dylib))) for dylib in dylibs if not os.path.islink(dylib)]
+    else:
+        dylibs = [(dylib, os.path.basename(dylib)) for dylib in dylibs]
+
+    for dylib, staged_name in dylibs:
+        staged = os.path.join(stage_dir, staged_name)
         print(f"Staging OpenCV dylib: {dylib} -> {staged}")
         shutil.copy2(dylib, staged)
 
@@ -122,9 +140,16 @@ def main(argv):
             raise FileNotFoundError(f"Additional binary not found: {path}")
 
     stage_opencv_dylibs(opencv_root, stage_dir)
-    for path in [binding] + extra_binaries + sorted(glob.glob(os.path.join(stage_dir, "*.dylib"))):
+    rewritten = [binding] + extra_binaries + sorted(glob.glob(os.path.join(stage_dir, "*.dylib")))
+    for path in rewritten:
         rewrite_opencv_dependencies(path, stage_dir)
     rewrite_opencv_ids(stage_dir)
+    # install_name_tool invalidates non-linker signatures, and arm64 macOS kills any
+    # process which loads code with an invalid signature (tests import these before freeze)
+    if platform.machine() == "arm64":
+        for path in rewritten:
+            if not os.path.islink(path):
+                run(["codesign", "--force", "--sign", "-", path])
     return 0
 
 

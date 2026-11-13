@@ -58,6 +58,7 @@ import sys
 import platform
 import fnmatch
 import json
+import re
 import subprocess
 from shutil import copytree, rmtree, copy
 from cx_Freeze import setup, Executable
@@ -715,7 +716,9 @@ elif sys.platform == "darwin":
         for filename in find_files(qt_plugins_path, ["*"]):
             relative_filepath = os.path.relpath(filename, start=qt_plugins_path)
             plugin_name = os.path.dirname(relative_filepath)
-            if plugin_name in ["imageformats", "platforms"]:
+            # Qt 6 moved the native macOS widget style into a separate plugin
+            mac_plugin_names = ["imageformats", "platforms"] + (["styles"] if QT_API != "pyqt5" else [])
+            if plugin_name in mac_plugin_names:
                 external_so_files.append((filename, relative_filepath))
     else:
         log.warning("Qt plugins path not found on macOS: %s", qt_plugins_path)
@@ -731,6 +734,9 @@ elif sys.platform == "darwin":
                                          os.path.join(brew_prefix, "opt/giflib/lib/libgif.dylib"),
                                          os.path.join(brew_prefix, "opt/tesseract/lib/libtesseract.4.dylib"),
                                          os.path.join(brew_prefix, "opt/leptonica/lib/liblept.5.dylib")]
+    if platform.machine() == "arm64":
+        # Homebrew's FFmpeg links Tesseract -> Leptonica -> giflib; excluding giflib breaks libavfilter
+        build_exe_options["bin_excludes"].remove(os.path.join(brew_prefix, "opt/giflib/lib/libgif.dylib"))
 
 # The SVG image loader alone rasterizes QIcons at their intrinsic size. Keep
 # the SVG icon engine too, so badges render at the display's device pixel ratio.
@@ -763,7 +769,23 @@ build_exe_options["excludes"] = ["distutils",
                                  "{}.QtWebKit".format(QT_BINDING_PACKAGE),
                                  "{}.QtWebKitWidgets".format(QT_BINDING_PACKAGE)]
 if sys.platform == "darwin":
-    build_exe_options["excludes"].append("sentry_sdk.integrations.django")
+    # sentry_sdk 2.x imports its auto-enabling integrations (including Django) during init and
+    # only tolerates DidNotEnable, so excluding the module would break error reporting startup.
+    try:
+        from sentry_sdk import integrations as sentry_integrations
+        sentry_auto_integrations = getattr(sentry_integrations, "_AUTO_ENABLING_INTEGRATIONS", [])
+    except ImportError:
+        sentry_auto_integrations = []
+    if not any(name.startswith("sentry_sdk.integrations.django.") for name in sentry_auto_integrations):
+        build_exe_options["excludes"].append("sentry_sdk.integrations.django")
+    if QT_API == "pyqt6":
+        # The PyQt6 wheel ships every Qt module (and plugins such as an ODBC driver linked
+        # to missing Homebrew libraries); keep only the modules OpenShot imports.
+        build_exe_options["excludes"].extend("PyQt6." + name for name in (
+            "QtBluetooth", "QtDBus", "QtDesigner", "QtHelp", "QtMultimedia", "QtMultimediaWidgets",
+            "QtNfc", "QtPdf", "QtPdfWidgets", "QtPositioning", "QtPrintSupport", "QtQml", "QtQuick",
+            "QtQuick3D", "QtQuickWidgets", "QtRemoteObjects", "QtSensors", "QtSerialPort",
+            "QtSpatialAudio", "QtSql", "QtTextToSpeech", "QtWebChannel", "QtWebSockets", "QtXml"))
 elif sys.platform == "linux":
     # The portal client uses asyncio; its optional GLib adapter must not pull
     # PyGObject and GTK into the AppImage.
@@ -774,8 +796,18 @@ elif sys.platform == "linux":
 # Set options
 build_options["build_exe"] = build_exe_options
 
+_SNAKE_CASE_EXECUTABLE = "target_name" in inspect.signature(Executable.__init__).parameters
+
+
+def make_executable(script, **options):
+    """Create an Executable; cx_Freeze 7+ only accepts snake_case options (targetName -> target_name)."""
+    if _SNAKE_CASE_EXECUTABLE:
+        options = {re.sub(r"(?<!^)(?=[A-Z])", "_", key).lower(): value for key, value in options.items()}
+    return Executable(script, **options)
+
+
 # Define launcher executable to create
-exes = [Executable("openshot_qt/launch.py",
+exes = [make_executable("openshot_qt/launch.py",
                    base=base,
                    icon=os.path.join(PATH, "xdg", iconFile),
                    shortcutName="%s" % info.PRODUCT_NAME,
@@ -784,13 +816,13 @@ exes = [Executable("openshot_qt/launch.py",
                    copyright=info.COPYRIGHT)]
 
 # Agent CLI needs a console entry point, including in GUI-only Windows bundles.
-exes.append(Executable("openshot_qt/cli.py", base=None,
+exes.append(make_executable("openshot_qt/cli.py", base=None,
                        targetName="openshot-cli.exe" if sys.platform == "win32" else "openshot-cli",
                        copyright=info.COPYRIGHT))
 
 try:
     # Include extra launcher configuration, if defined
-    exes.append(Executable("openshot_qt/launch.py",
+    exes.append(make_executable("openshot_qt/launch.py",
                 base=extra_exe['base'],
                 icon=os.path.join(PATH, "xdg", iconFile),
                 targetName=extra_exe['name'],
@@ -836,8 +868,13 @@ if sys.platform == "darwin":
             if frozen_path.startswith("exe"):
                 fix_rpath(os.path.join(build_path, frozen_path))
             elif frozen_path.endswith(".app"):
-                fix_rpath(os.path.join(build_path, frozen_path, "Contents", "MacOS"))
-                print_min_versions(os.path.join(build_path, frozen_path, "Contents", "MacOS"))
+                contents_path = os.path.join(build_path, frozen_path, "Contents")
+                macos_path = os.path.join(contents_path, "MacOS")
+                fix_rpath(macos_path)
+                # cx_Freeze 7+ keeps only executables in Contents/MacOS (lib/ is a symlink into
+                # Contents/Resources), so scan the whole bundle for minimum macOS versions
+                cx_freeze_resources_layout = os.path.islink(os.path.join(macos_path, "lib"))
+                print_min_versions(contents_path if cx_freeze_resources_layout else macos_path)
 
 elif sys.platform == "win32":
     # The freezer can prefer DLLs beside its own Python executable over the
@@ -892,6 +929,12 @@ all_platform_prune_patterns = [
     "PyQt5.uic.widget-plugins/qtwebkit.py",
     "PyQt5.uic.widget-plugins/__pycache__/qtwebenginewidgets.*",
     "PyQt5.uic.widget-plugins/__pycache__/qtwebkit.*",
+    "lib/PyQt6/QtWebChannel.*",
+    "lib/PyQt6/QtWebSockets.*",
+    "lib/PyQt6/bindings/QtWebChannel",
+    "lib/PyQt6/bindings/QtWebSockets",
+    "lib/PyQt6/uic/widget-plugins/qtwebenginewidgets.py",
+    "lib/PyQt6/uic/widget-plugins/__pycache__/qtwebenginewidgets.*",
     "QtWebChannel",
     "QtWebEngine",
     "QtWebEngineCore",

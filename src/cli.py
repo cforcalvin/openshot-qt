@@ -36,6 +36,9 @@ import uuid
 
 if not getattr(sys, "frozen", False):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+else:
+    # Bytecode caches written inside a signed app bundle would invalidate its signature
+    sys.dont_write_bytecode = True
 from classes.easing import easing_presets
 from classes.look_presets import LOOK_PRESETS
 from classes.agent.protocol import CommandError, cli_command, parse_json, records, session_dir

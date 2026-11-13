@@ -585,7 +585,14 @@ class About(QDialog):
                             cpu_name = line.split(":", 1)[1].strip()
                             break
             elif system_name == "Darwin":
-                cpu_name = platform.processor().strip()
+                # platform.processor() only returns "arm" on Apple Silicon (e.g. want "Apple M2")
+                libc = ctypes.CDLL("/usr/lib/libSystem.B.dylib")
+                key = b"machdep.cpu.brand_string"
+                size = ctypes.c_size_t(0)
+                if libc.sysctlbyname(key, None, ctypes.byref(size), None, 0) == 0 and size.value:
+                    brand = ctypes.create_string_buffer(size.value)
+                    if libc.sysctlbyname(key, brand, ctypes.byref(size), None, 0) == 0:
+                        cpu_name = brand.value.decode("utf-8", errors="ignore").strip()
             elif system_name == "Windows":
                 cpu_name = platform.processor().strip()
         except Exception:

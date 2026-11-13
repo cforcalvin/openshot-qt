@@ -163,11 +163,14 @@ class OpenShotApp(QApplication):
         openshot.Settings.Instance().PATH_OPENSHOT_INSTALL = info.PATH
 
         # Set BABL extensions path
-        babl_ext_path = os.path.join(info.PATH, "lib", "babl-ext")
-        log.info(f"checking babl_ext_path: {babl_ext_path}")
-        if os.path.exists(babl_ext_path):
-            os.environ["BABL_PATH"] = babl_ext_path
-            log.info(f"setting BABL_PATH: {babl_ext_path}")
+        # Frozen apps keep babl-ext in lib/ next to the sources (cx_Freeze 7+ macOS bundles
+        # put the sources themselves in lib/, so babl-ext sits beside them)
+        for babl_ext_path in (os.path.join(info.PATH, "lib", "babl-ext"), os.path.join(info.PATH, "babl-ext")):
+            log.info(f"checking babl_ext_path: {babl_ext_path}")
+            if os.path.exists(babl_ext_path):
+                os.environ["BABL_PATH"] = babl_ext_path
+                log.info(f"setting BABL_PATH: {babl_ext_path}")
+                break
 
         # Check to disable sentry
         if self.mode == "unittest" or not self.settings.get('send_metrics'):
