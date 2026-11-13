@@ -231,6 +231,7 @@ class HardwareComboBox(QComboBox):
         self.popup_view.setItemDelegate(HardwareItemDelegate(self.popup_view))
         self.popup_view.clicked.connect(self._accept_filter_index)
         self.popup_view.activated.connect(self._accept_filter_index)
+        self.popup_view.installEventFilter(self)
         layout.addWidget(self.popup_view)
         self.filter_empty = QLabel(self.tr("No matching formats"), self.filter_popup)
         layout.addWidget(self.filter_empty)
@@ -273,6 +274,11 @@ class HardwareComboBox(QComboBox):
         if (watched is getattr(self, 'filter_search', None)
                 and event.type() == QEvent.KeyPress and event.key() == Qt.Key_Down):
             self.popup_view.setFocus()
+            return True
+        # macOS item views start editing on Return instead of emitting activated()
+        if (watched is getattr(self, 'popup_view', None) and event.type() == QEvent.KeyPress
+                and event.key() in (Qt.Key_Return, Qt.Key_Enter)):
+            self._accept_filter_current()
             return True
         return super().eventFilter(watched, event)
 

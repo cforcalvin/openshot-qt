@@ -121,7 +121,7 @@ def verify():
     finally:
         # Qt6 quit() closes windows first; skip the unsaved-changes prompt.
         app.project.has_unsaved_changes = False
-        app.quit()
+        app.exit(0)  # Qt 6 quit() closes windows first, which prompts to save the project
 
 
 checks.assertTrue(app.gui())

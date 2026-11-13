@@ -162,7 +162,11 @@ def color(value, path):
 
 def installed_fonts():
     from qt_api import QFontDatabase
-    return sorted(set(QFontDatabase().families()), key=str.lower)
+    try:
+        font_db = QFontDatabase()
+    except TypeError:  # Qt6 removes the default constructor
+        font_db = QFontDatabase
+    return sorted(set(font_db.families()), key=str.lower)
 
 
 def font_family(value):

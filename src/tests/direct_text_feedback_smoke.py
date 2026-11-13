@@ -269,7 +269,7 @@ def verify():
     except Exception:
         traceback.print_exc()
     finally:
-        app.quit()
+        app.exit(0)  # Qt 6 quit() closes windows first, which prompts to save the project
 
 
 checks.assertTrue(app.gui())

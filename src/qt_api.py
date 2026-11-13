@@ -1068,13 +1068,18 @@ def _patch_enums_for_qt6():
 
     QLibraryInfo = getattr(QtCore, "QLibraryInfo", None)
     if QLibraryInfo:
-        # Backfill TranslationsPath constant and location() alias
+        # Backfill unscoped path constants (TranslationsPath, PluginsPath, ...) and location() alias
         lib_path_enum = getattr(QLibraryInfo, "LibraryPath", None)
-        if lib_path_enum and not hasattr(QLibraryInfo, "TranslationsPath"):
-            try:
-                setattr(QLibraryInfo, "TranslationsPath", lib_path_enum.TranslationsPath)
-            except Exception:
-                pass
+        if lib_path_enum:
+            members = getattr(lib_path_enum, "__members__", None) or {
+                name: getattr(lib_path_enum, name) for name in ("TranslationsPath", "PluginsPath")
+                if hasattr(lib_path_enum, name)}
+            for name, val in members.items():
+                if not hasattr(QLibraryInfo, name):
+                    try:
+                        setattr(QLibraryInfo, name, val)
+                    except Exception:
+                        pass
         if hasattr(QLibraryInfo, "path") and not hasattr(QLibraryInfo, "location"):
             try:
                 setattr(QLibraryInfo, "location", staticmethod(QLibraryInfo.path))
@@ -1121,9 +1126,17 @@ def _patch_enums_for_qt6():
     for owner, enum_name in (
             (getattr(QtCore, "Qt", None), "WidgetAttribute"),
             (getattr(QtCore, "Qt", None), "ToolBarArea"),
+            (getattr(QtCore, "Qt", None), "LayoutDirection"),
+            (getattr(QtCore, "QEvent", None), "Type"),
             (getattr(QtCore, "QIODevice", None), "OpenModeFlag"),
             (getattr(QtGui, "QContextMenuEvent", None), "Reason"),
             (getattr(QtWidgets, "QAbstractItemView", None), "EditTrigger"),
+            (getattr(QtWidgets, "QAbstractItemView", None), "State"),
+            (getattr(QtGui, "QFont", None), "SpacingType"),
+            (getattr(QtGui, "QIcon", None), "Mode"),
+            (getattr(QtGui, "QIcon", None), "State"),
+            (getattr(QtGui, "QTextCursor", None), "SelectionType"),
+            (getattr(QtGui, "QTextOption", None), "WrapMode"),
             (getattr(QtWidgets, "QFormLayout", None), "ItemRole"),
             (getattr(QtWidgets, "QStyle", None), "ControlElement")):
         scoped = getattr(owner, enum_name, None)

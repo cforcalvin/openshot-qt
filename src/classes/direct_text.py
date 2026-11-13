@@ -24,7 +24,11 @@ def default_font_family():
     global _default_font
     if _default_font is None:
         from qt_api import QFontDatabase, QFontInfo
-        families = set(QFontDatabase().families())
+        try:
+            font_db = QFontDatabase()
+        except TypeError:  # Qt6 removes the default constructor
+            font_db = QFontDatabase
+        families = set(font_db.families())
         _default_font = next((name for name in DEFAULT_FONTS if name in families), None) \
             or QFontInfo(QFont()).family()
     return _default_font

@@ -30,7 +30,7 @@ from pathlib import Path
 import secrets
 import uuid
 
-from qt_api import QObject
+from qt_api import QDir, QObject
 from .protocol import CommandError, MAX_MESSAGE, VERSION, decode, encode, network, session_dir
 from .service import EditingService
 
@@ -50,6 +50,10 @@ class SessionServer(QObject):
         # macOS temporary directories leave little room for a Unix socket name.
         # Discovery records carry the full endpoint; it need not contain the session ID.
         self.endpoint = 'osa-' + uuid.uuid4().hex[:16]
+        # Unix socket paths are limited to ~104 bytes on macOS (Qt 6 refuses longer ones), so a
+        # long TMPDIR falls back to an absolute socket path in /tmp.
+        if os.name == 'posix' and len(os.path.join(QDir.tempPath(), self.endpoint).encode()) > 100:
+            self.endpoint = os.path.join('/tmp', self.endpoint)
         if not self.server.listen(self.endpoint):
             raise RuntimeError(self.server.errorString())
         self.server.newConnection.connect(self.accept)

@@ -117,6 +117,19 @@ with patch("classes.qt_bootstrap.os.name", "nt"):
         flags = qt_api.Qt.AlignLeft | qt_api.Qt.AlignVCenter | qt_api.Qt.TextShowMnemonic
         self.assertNotEqual(int(getattr(flags, "value", flags)), 0)
 
+    def test_unscoped_enum_aliases_used_by_text_icons_and_views(self):
+        for owner, name in (("QAbstractItemView", "EditingState"), ("QFont", "AbsoluteSpacing"),
+                            ("QIcon", "Normal"), ("QIcon", "Active"), ("QIcon", "On"), ("QIcon", "Off"),
+                            ("QTextCursor", "Document"), ("QTextOption", "WrapAtWordBoundaryOrAnywhere")):
+            with self.subTest(owner=owner, name=name, binding=qt_api.QT_API):
+                self.assertIsNotNone(getattr(getattr(qt_api, owner), name))
+
+    def test_library_paths_used_by_freeze_are_available_on_all_bindings(self):
+        for name in ("TranslationsPath", "PluginsPath"):
+            with self.subTest(name=name, binding=qt_api.QT_API):
+                path = qt_api.QLibraryInfo.location(getattr(qt_api.QLibraryInfo, name))
+                self.assertIsInstance(path, str)
+
     def test_common_qt_types_are_eagerly_exported(self):
         """Python 3.6 cannot use the module-level __getattr__ fallback."""
         for name in ("QCoreApplication", "QPointF", "QRectF", "Qt"):
@@ -133,7 +146,8 @@ with patch("classes.qt_bootstrap.os.name", "nt"):
         for name in ("ShortcutOverride", "Resize", "Paint", "KeyPress", "KeyRelease",
                      "MouseButtonPress", "MouseButtonRelease", "MouseMove", "Wheel",
                      "TouchBegin", "TouchUpdate", "WindowActivate", "WindowStateChange",
-                     "DeferredDelete", "Close", "Hide", "Show", "Move"):
+                     "DeferredDelete", "Close", "Hide", "Show", "Move",
+                     "FontChange", "StyleChange", "PaletteChange", "LayoutRequest"):
             with self.subTest(name=name, binding=qt_api.QT_API):
                 event_type = getattr(qt_api.QEvent, name)
                 self.assertEqual(qt_api.QEvent(event_type).type(), event_type)

@@ -1,9 +1,10 @@
 """Shared grip hit testing for the timeline zoom and source-range controls."""
-from qt_api import QRectF
+from qt_api import QPointF, QRectF
 
 
 def range_hit_target(pos, selection, left_grip, right_grip, move_rect, top, height, midpoint=None):
     """Expand painted grips and split overlapping targets so both remain usable."""
+    pos = QPointF(pos)  # Qt6 bindings do not convert QPoint (mouse events) for QRectF.contains()
     left_hit = QRectF(left_grip.left() - 4, top, left_grip.width() + 8, height).contains(pos)
     right_hit = QRectF(right_grip.left() - 4, top, right_grip.width() + 8, height).contains(pos)
     if left_hit and right_hit:

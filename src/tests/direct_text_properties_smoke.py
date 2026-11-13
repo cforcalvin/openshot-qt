@@ -15,7 +15,7 @@ from classes import version
 # UI workflow checks must not depend on the external update service.
 version.get_current_Version = lambda: None
 from classes.query import Clip
-from qt_api import QColor, QCoreApplication, QEvent, QFont, QTimer, QT_API
+from qt_api import QColor, QCoreApplication, QEvent, QFont, QFontInfo, QTimer, QT_API
 QTest = importlib.import_module({"pyqt5": "PyQt5", "pyqt6": "PyQt6", "pyside6": "PySide6"}[QT_API] + ".QtTest").QTest
 
 app = OpenShotApp([], mode="unittest")
@@ -109,7 +109,8 @@ def verify():
             table._choose_property_font(model.model.item(table.selected_item.row(), 0).data())
         selected_font = Clip.get(id=clip.id).data["direct_text"]
         checks.assertTrue(selected_font["font_size"] == 93 and not selected_font["font_bold"] and not selected_font["font_italic"])
-        checks.assertEqual(selected_font["font_family"], "DejaVu Serif")
+        # The installed family Qt resolves (DejaVu Serif on Linux CI, a fallback where it is missing)
+        checks.assertEqual(selected_font["font_family"], QFontInfo(chosen).family())
         checks.assertNotEqual(Clip.get(id=clip.id).data["reader"]["font"], after["reader"]["font"])
         app.updates.undo()
         checks.assertEqual(Clip.get(id=clip.id).data["direct_text"], after["direct_text"])
@@ -209,7 +210,7 @@ def verify():
     except Exception:
         traceback.print_exc()
     finally:
-        app.quit()
+        app.exit(0)  # Qt 6 quit() closes windows first, which prompts to save the project
 
 
 checks.assertTrue(app.gui())
