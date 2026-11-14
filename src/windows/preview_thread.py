@@ -45,6 +45,9 @@ from windows.scope_panel import build_vectorscope_image, normalize_vectorscope_d
 class PreviewParent(QObject, UpdateInterface):
     """ Class which communicates with the PlayerWorker Class (running on a separate thread) """
 
+    # (name, type) of the audio output device, each time one is opened
+    audio_device_opened = pyqtSignal(str, str)
+
     def changed(self, action):
         """ This method is invoked by the UpdateManager each time a change happens (i.e UpdateInterface) """
 
@@ -176,22 +179,12 @@ class PreviewParent(QObject, UpdateInterface):
         if type(project.get("sample_rate")) == float:
             update_project_sample_rate_without_dirty(round(project.get("sample_rate")))
 
-        # Check active audio device name and type from audio device
+        # The open device is reported, not saved: the setting holds the user's choice
+        # (blank = follow the system default output)
         device_name = info.get("device_name", "")
         device_type = info.get("device_type", "")
-        audio_device_value = f"{device_name}||{device_type}"
-        if s.get("playback-audio-device") != audio_device_value:
-            log.warning("Your active audio device (%s) does not match OpenShot (%s). "
-                        "Adjusting your 'Preferences->Playback->Audio Device' to match your "
-                        "active audio device: %s" % (audio_device_value,
-                                                     s.get("playback-audio-device"),
-                                                     audio_device_value))
-            s.set("playback-audio-device", audio_device_value)
-
-            # Set libopenshot settings
-            lib_settings = openshot.Settings.Instance()
-            lib_settings.PLAYBACK_AUDIO_DEVICE_NAME = device_name
-            lib_settings.PLAYBACK_AUDIO_DEVICE_TYPE = device_type
+        log.info("Audio output device: %s (%s)", device_name or "(none)", device_type or "unknown type")
+        self.audio_device_opened.emit(device_name, device_type)
 
     def Stop(self, wait_for_thread=True):
         """Disconnect preview parent from update manager and stop worker thread"""
@@ -315,12 +308,16 @@ class PlayerWorker(QObject):
         self._scope_lock = threading.Lock()
         self._pending_scope_request = None
         self._scope_analysis_active = False
+        self._audio_device_generation = None
 
         # Create QtPlayer class from libopenshot
         self.player = openshot.QtPlayer()
 
     def CheckAudioDevice(self):
         """Query the open audio device on the worker thread and hand the results to the GUI thread"""
+        if hasattr(self.player, "GetAudioDeviceGeneration"):
+            self._audio_device_generation = self.player.GetAudioDeviceGeneration()
+
         # Check audio init error
         audio_error = self.player.GetError()
         if audio_error:
@@ -370,6 +367,12 @@ class PlayerWorker(QObject):
             if self.player.Mode() != self.current_mode:
                 self.current_mode = self.player.Mode()
                 self.mode_changed.emit(self.current_mode)
+
+            # Re-check the audio device after a switch (the first check is delayed, above)
+            if (self._audio_device_generation is not None
+                    and self.player.GetAudioDeviceGeneration() != self._audio_device_generation):
+                self.CheckAudioDevice()
+
             # wait for a small delay
             time.sleep(0.005)
             QCoreApplication.processEvents()

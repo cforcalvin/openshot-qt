@@ -34,6 +34,7 @@ from windows.preview_thread import PlayerWorker, PreviewParent
 
 def _player(sample_rate="44100.0", name="AirPods Pro", device_type="CoreAudio"):
     player = Mock()
+    player.GetAudioDeviceGeneration.return_value = 3
     player.GetError.return_value = ""
     player.GetDefaultSampleRate.return_value = sample_rate
     player.GetCurrentAudioDevice.return_value = SimpleNamespace(
@@ -54,7 +55,8 @@ class _Settings:
 
 class CheckAudioDeviceTests(unittest.TestCase):
     def test_worker_only_emits_device_info(self):
-        worker = SimpleNamespace(player=_player(), error_found=Mock(), audio_device_checked=Mock())
+        worker = SimpleNamespace(player=_player(), error_found=Mock(), audio_device_checked=Mock(),
+                                 _audio_device_generation=None)
         app = Mock(side_effect=AssertionError("worker thread must not touch app state"))
         with patch("windows.preview_thread.get_app", app):
             PlayerWorker.CheckAudioDevice(worker)
@@ -64,17 +66,17 @@ class CheckAudioDeviceTests(unittest.TestCase):
             "device_type": "CoreAudio",
         })
         worker.error_found.emit.assert_not_called()
+        self.assertEqual(worker._audio_device_generation, 3)
 
-    def test_gui_thread_applies_sample_rate_and_device(self):
+    def test_gui_thread_applies_sample_rate_and_reports_device(self):
         settings = _Settings({"default-samplerate": 48000, "playback-audio-device": ""})
         project = Mock(has_unsaved_changes=False)
         project.get.return_value = 48000
         updates = Mock()
         app = SimpleNamespace(get_settings=lambda: settings, project=project, updates=updates)
-        lib_settings = SimpleNamespace(PLAYBACK_AUDIO_DEVICE_NAME="", PLAYBACK_AUDIO_DEVICE_TYPE="")
-        with patch("windows.preview_thread.get_app", return_value=app), \
-                patch("windows.preview_thread.openshot.Settings.Instance", return_value=lib_settings):
-            PreviewParent.onAudioDeviceChecked(None, {
+        preview = SimpleNamespace(audio_device_opened=Mock())
+        with patch("windows.preview_thread.get_app", return_value=app):
+            PreviewParent.onAudioDeviceChecked(preview, {
                 "sample_rate": 44100.0,
                 "device_name": "AirPods Pro",
                 "device_type": "CoreAudio",
@@ -82,9 +84,9 @@ class CheckAudioDeviceTests(unittest.TestCase):
         self.assertEqual(settings.get("default-samplerate"), 44100)
         updates.update_untracked.assert_called_once_with(["sample_rate"], 44100)
         self.assertFalse(project.has_unsaved_changes)
-        self.assertEqual(settings.get("playback-audio-device"), "AirPods Pro||CoreAudio")
-        self.assertEqual(lib_settings.PLAYBACK_AUDIO_DEVICE_NAME, "AirPods Pro")
-        self.assertEqual(lib_settings.PLAYBACK_AUDIO_DEVICE_TYPE, "CoreAudio")
+        # The open device is reported, while the saved choice (follow default) is kept
+        preview.audio_device_opened.emit.assert_called_once_with("AirPods Pro", "CoreAudio")
+        self.assertEqual(settings.get("playback-audio-device"), "")
 
     def test_undetected_rate_leaves_settings_alone(self):
         settings = _Settings({"default-samplerate": 48000, "playback-audio-device": "Speakers||CoreAudio"})
@@ -92,8 +94,9 @@ class CheckAudioDeviceTests(unittest.TestCase):
         project.get.return_value = 48000
         updates = Mock()
         app = SimpleNamespace(get_settings=lambda: settings, project=project, updates=updates)
+        preview = SimpleNamespace(audio_device_opened=Mock())
         with patch("windows.preview_thread.get_app", return_value=app):
-            PreviewParent.onAudioDeviceChecked(None, {
+            PreviewParent.onAudioDeviceChecked(preview, {
                 "sample_rate": float("nan"),
                 "device_name": "Speakers",
                 "device_type": "CoreAudio",

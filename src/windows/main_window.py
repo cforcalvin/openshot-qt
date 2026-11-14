@@ -60,6 +60,7 @@ from qt_api import (
 from classes import exceptions, info, qt_types, sentry, ui_util, updates, tabstops
 from classes.app import get_app
 from classes.asset_keyboard import AssetKeyboardMixin
+from classes.audio_output import AudioOutputController, migrate_device_setting
 from classes.exporters.edl import export_edl
 from classes.exporters.final_cut_pro import export_xml
 from classes.importers.edl import import_edl
@@ -283,6 +284,9 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
 
         # Process any queued events
         QCoreApplication.processEvents()
+
+        if getattr(self, "audio_output", None):
+            self.audio_output.stop()
 
         # Stop preview thread (and wait for it to end)
         if self.preview_thread:
@@ -4339,6 +4343,11 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
         self.videoToolbar = QToolBar("Video Toolbar", self.dockVideoContents)
         self.videoToolbar.setObjectName("videoToolbar")
         self.tabVideo.addWidget(self.videoToolbar)
+        self.audioOutputButton = None
+        if hasattr(openshot.QtPlayer, "SetAudioDevice"):
+            from windows.views.audio_output_button import AudioOutputButton
+            self.audioOutputButton = AudioOutputButton(self.videoToolbar)
+            self.ThemeChangedSignal.connect(lambda _theme: self.audioOutputButton.refresh_icon())
 
         # Add Timeline toolbar
         self.timelineToolbar = QToolBar("Timeline Toolbar", getattr(self, "dockTimelineContents", self))
@@ -5739,6 +5748,11 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
         self.preview_parent = PreviewParent()
         self.preview_parent.Init(self, self.timeline_sync.timeline, self.videoPreview)
         self.preview_thread = self.preview_parent.worker
+        self.audio_output = None
+        if self.audioOutputButton:
+            self.audio_output = AudioOutputController(self.preview_thread.player, parent=self)
+            self.preview_parent.audio_device_opened.connect(self.audio_output.on_device_opened)
+            self.audioOutputButton.set_controller(self.audio_output)
         self.sliderZoomWidget.connect_playback()
         self.timeline.connect_playback()
 
@@ -5801,6 +5815,7 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
         # - NEW settings include both device name and type (double pipe delimited)
         #   (i.e. "PulseAudio Sound Server||ALSA")
         playback_buffer_size = s.get("playback-buffer-size") or 512
+        migrate_device_setting(s)
         playback_device_value = s.get("playback-audio-device") or ""
         playback_device_parts = playback_device_value.split("||")
         playback_device_name = playback_device_parts[0]

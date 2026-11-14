@@ -305,8 +305,14 @@
     "category": "Preview",
     "setting": "playback-audio-device",
     "type": "dropdown",
-    "values": [],
-    "restart": true
+    "values": []
+  },
+  {
+    "value": false,
+    "title": "",
+    "type": "hidden",
+    "category": "Preview",
+    "setting": "playback-audio-device-explicit"
   },
   {
     "max": 192000,

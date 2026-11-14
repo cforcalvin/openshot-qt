@@ -466,6 +466,8 @@ QMessageBox QDialogButtonBox#qt_msgbox_buttonbox QPushButton[dialogRole="cancel"
             {"action": self.app.window.actionJumpEnd, "style": Qt.ToolButtonIconOnly},
             {"expand": True}
         ]
+        if getattr(self.app.window, "audioOutputButton", None):
+            toolbar_buttons.append({"widget": self.app.window.audioOutputButton})
         self.set_toolbar_buttons(self.app.window.videoToolbar, icon_size=24, settings=toolbar_buttons)
 
         # Init icons from theme name

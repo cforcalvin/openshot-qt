@@ -969,6 +969,12 @@ class Preferences(QDialog):
             if get_app().theme_manager:
                 get_app().theme_manager.apply_theme(value)
 
+        if param["setting"] == "playback-audio-device":
+            from classes.audio_output import parse_device_setting
+            audio_output = getattr(get_app().window, "audio_output", None)
+            if audio_output:
+                audio_output.select(*parse_device_setting(value))
+
         if param["setting"] == "timeline-thumbnail-style":
             self._apply_timeline_thumbnail_style()
         if param["setting"] == "timeline-track-size":

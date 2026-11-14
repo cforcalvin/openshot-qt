@@ -1138,6 +1138,7 @@ def _patch_enums_for_qt6():
             (getattr(QtGui, "QTextCursor", None), "SelectionType"),
             (getattr(QtGui, "QTextOption", None), "WrapMode"),
             (getattr(QtWidgets, "QFormLayout", None), "ItemRole"),
+            (getattr(QtWidgets, "QToolButton", None), "ToolButtonPopupMode"),
             (getattr(QtWidgets, "QStyle", None), "ControlElement")):
         scoped = getattr(owner, enum_name, None)
         members = getattr(scoped, "__members__", None)
