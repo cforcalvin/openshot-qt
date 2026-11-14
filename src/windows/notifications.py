@@ -14,7 +14,7 @@ from classes import info
 
 def notification_icon(window, name, theme=None):
     """Matching outline menu icons with each theme's foreground color."""
-    if name == "tool-optimize-preview":
+    if name in ("tool-optimize-preview", "tool-profile"):
         return QIcon(os.path.join(info.PATH, "themes", "cosmic", "images", name + ".svg"))
     theme_name = getattr(theme, "name", "")
     if not theme_name:

@@ -61,6 +61,7 @@ from classes import exceptions, info, qt_types, sentry, ui_util, updates, tabsto
 from classes.app import get_app
 from classes.asset_keyboard import AssetKeyboardMixin
 from classes.audio_output import AudioOutputController, migrate_device_setting
+from classes.profile_matching import PROJECT_FLAG as PROFILE_USER_SELECTED, ProfileAutoMatch
 from classes.exporters.edl import export_edl
 from classes.exporters.final_cut_pro import export_xml
 from classes.importers.edl import import_edl
@@ -2568,7 +2569,7 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
                     # Choose the edited profile
                     self.actionProfile_trigger(profile)
 
-    def actionProfile_trigger(self, profile=None):
+    def actionProfile_trigger(self, profile=None, user_selected=True):
         # Disable video caching
         openshot.Settings.Instance().ENABLE_PLAYBACK_CACHING = False
 
@@ -2634,6 +2635,9 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
             if profile_changed:
                 # Export dialog settings are profile-dependent; reset cache on profile changes.
                 get_app().updates.update(["export_settings"], None)
+            if user_selected and proj.get(PROFILE_USER_SELECTED) is False:
+                # A hand-picked profile is never replaced by auto-matching
+                get_app().updates.update([PROFILE_USER_SELECTED], True)
 
             # Clear transaction id
             get_app().updates.transaction_id = None
@@ -5566,6 +5570,9 @@ class MainWindow(AssetKeyboardMixin, updates.UpdateWatcher, QMainWindow):
 
         # Add window as watcher to receive undo/redo status updates
         app.updates.add_watcher(self)
+
+        self.profile_auto_match = ProfileAutoMatch(self)
+        app.updates.add_listener(self.profile_auto_match)
 
         from windows.notifications import UpdateNotificationController
         self.update_notifications = UpdateNotificationController(

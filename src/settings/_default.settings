@@ -66,6 +66,13 @@
     "restart": true
   },
   {
+    "value": true,
+    "title": "Match Project to First Video Clip",
+    "type": "bool",
+    "category": "General",
+    "setting": "auto-match-profile"
+  },
+  {
     "value": "",
     "title": "",
     "type": "hidden",

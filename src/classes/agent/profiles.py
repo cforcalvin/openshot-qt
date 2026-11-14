@@ -198,6 +198,8 @@ def apply(service, params):
     updates.update(['profile_settings'], profile)
     for key in ('profile', 'width', 'height', 'display_ratio', 'pixel_ratio', 'fps'):
         updates.update([key], profile['description'] if key == 'profile' else profile[key])
+    if project.get('profile_user_selected') is not None:
+        updates.update(['profile_user_selected'], True)
     # Keep the final converted arrays explicit in the transaction for deterministic
     # redo, and synchronize durations after the existing trim-grid conversion.
     for key in ('clips', 'effects'):
