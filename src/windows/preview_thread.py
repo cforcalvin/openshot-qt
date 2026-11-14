@@ -133,6 +133,66 @@ class PreviewParent(QObject, UpdateInterface):
         # Only JUCE audio errors bubble up here now
         QMessageBox.warning(self.parent, _("Audio Error"), _("Please fix the following error and restart OpenShot\n%s") % error)
 
+    @pyqtSlot(object)
+    def onAudioDeviceChecked(self, info):
+        """Sync settings and project with the open audio device (sample rate, device name/type)"""
+        s = get_app().get_settings()
+        project = get_app().project
+
+        def update_project_sample_rate_without_dirty(value):
+            """Normalize startup audio settings without changing project dirty state."""
+            previous_dirty = project.has_unsaved_changes
+            get_app().updates.update_untracked(["sample_rate"], value)
+            project.has_unsaved_changes = previous_dirty
+
+        detected_sample_rate_int = None
+        detected_sample_rate = info.get("sample_rate")
+        if detected_sample_rate and not math.isnan(detected_sample_rate) and detected_sample_rate > 0.0:
+            # Convert float to Integer
+            detected_sample_rate_int = round(detected_sample_rate)
+
+            settings_sample_rate = int(s.get("default-samplerate") or 48000)
+            if detected_sample_rate_int != settings_sample_rate:
+                log.warning("Your sample rate (%d) does not match OpenShot (%d). "
+                            "Adjusting your 'Preferences->Preview->Default Sample Rate to match your "
+                            "system rate: %d." % (detected_sample_rate_int,
+                                                  settings_sample_rate,
+                                                  detected_sample_rate_int))
+
+                # Update default sample rate in settings
+                s.set("default-samplerate", detected_sample_rate_int)
+
+                # Update current project's sample rate, so we don't have some crazy
+                # audio drift due to mis-matching sample rates
+                update_project_sample_rate_without_dirty(detected_sample_rate_int)
+
+        # Convert float 'settings' sample rate to Integer, if detected
+        if type(s.get("default-samplerate")) == float:
+            if detected_sample_rate_int is None:
+                detected_sample_rate_int = round(s.get("default-samplerate"))
+            s.set("default-samplerate", detected_sample_rate_int)
+
+        # Convert float 'project' sample rate to Integer, if detected
+        if type(project.get("sample_rate")) == float:
+            update_project_sample_rate_without_dirty(round(project.get("sample_rate")))
+
+        # Check active audio device name and type from audio device
+        device_name = info.get("device_name", "")
+        device_type = info.get("device_type", "")
+        audio_device_value = f"{device_name}||{device_type}"
+        if s.get("playback-audio-device") != audio_device_value:
+            log.warning("Your active audio device (%s) does not match OpenShot (%s). "
+                        "Adjusting your 'Preferences->Playback->Audio Device' to match your "
+                        "active audio device: %s" % (audio_device_value,
+                                                     s.get("playback-audio-device"),
+                                                     audio_device_value))
+            s.set("playback-audio-device", audio_device_value)
+
+            # Set libopenshot settings
+            lib_settings = openshot.Settings.Instance()
+            lib_settings.PLAYBACK_AUDIO_DEVICE_NAME = device_name
+            lib_settings.PLAYBACK_AUDIO_DEVICE_TYPE = device_type
+
     def Stop(self, wait_for_thread=True):
         """Disconnect preview parent from update manager and stop worker thread"""
         get_app().updates.disconnect_listener(self)
@@ -184,6 +244,7 @@ class PreviewParent(QObject, UpdateInterface):
         self.background.started.connect(self.worker.Start)
         self.worker.finished.connect(self.background.quit)
         self.worker.error_found.connect(self.onError)
+        self.worker.audio_device_checked.connect(self.onAudioDeviceChecked)
 
         # Connect preview thread to main UI signals
         self.parent.previewFrameSignal.connect(self.worker.previewFrame)
@@ -219,6 +280,7 @@ class PlayerWorker(QObject):
     error_found = pyqtSignal(object)
     ready = pyqtSignal()
     finished = pyqtSignal()
+    audio_device_checked = pyqtSignal(object)
     scope_ready = pyqtSignal(int, dict, dict)
     source_preview_ready = pyqtSignal(object, object)
 
@@ -258,69 +320,24 @@ class PlayerWorker(QObject):
         self.player = openshot.QtPlayer()
 
     def CheckAudioDevice(self):
-        """Check if any audio devices initialization errors, default sample rate, and current open audio device"""
-        s = get_app().get_settings()
-        project = get_app().project
-
-        def update_project_sample_rate_without_dirty(value):
-            """Normalize startup audio settings without changing project dirty state."""
-            previous_dirty = project.has_unsaved_changes
-            get_app().updates.update_untracked(["sample_rate"], value)
-            project.has_unsaved_changes = previous_dirty
-
+        """Query the open audio device on the worker thread and hand the results to the GUI thread"""
         # Check audio init error
         audio_error = self.player.GetError()
         if audio_error:
             log.warning('Audio initialization error: %s', audio_error)
             self.error_found.emit(audio_error)
 
-        # Check active sample rate from audio device
         # Parse string as float ("48000.0" -> 48000   OR   NaN)
         detected_sample_rate = float(self.player.GetDefaultSampleRate())
-        if detected_sample_rate and not math.isnan(detected_sample_rate) and detected_sample_rate > 0.0:
-            # Convert float to Integer
-            detected_sample_rate_int = round(detected_sample_rate)
-
-            settings_sample_rate = int(s.get("default-samplerate") or 48000)
-            if detected_sample_rate_int != settings_sample_rate:
-                log.warning("Your sample rate (%d) does not match OpenShot (%d). "
-                            "Adjusting your 'Preferences->Preview->Default Sample Rate to match your "
-                            "system rate: %d." % (detected_sample_rate_int,
-                                                  settings_sample_rate,
-                                                  detected_sample_rate_int))
-
-                # Update default sample rate in settings
-                s.set("default-samplerate", detected_sample_rate_int)
-
-                # Update current project's sample rate, so we don't have some crazy
-                # audio drift due to mis-matching sample rates
-                update_project_sample_rate_without_dirty(detected_sample_rate_int)
-
-        # Convert float 'settings' sample rate to Integer, if detected
-        if type(s.get("default-samplerate")) == float:
-            if detected_sample_rate_int is None:
-                detected_sample_rate_int = round(s.get("default-samplerate"))
-            s.set("default-samplerate", detected_sample_rate_int)
-
-        # Convert float 'project' sample rate to Integer, if detected
-        if type(project.get("sample_rate")) == float:
-            update_project_sample_rate_without_dirty(round(project.get("sample_rate")))
-
-        # Check active audio device name and type from audio device
         active_audio_device = self.player.GetCurrentAudioDevice()
-        audio_device_value = f"{active_audio_device.get_name()}||{active_audio_device.get_type()}"
-        if s.get("playback-audio-device") != audio_device_value:
-            log.warning("Your active audio device (%s) does not match OpenShot (%s). "
-                        "Adjusting your 'Preferences->Playback->Audio Device' to match your "
-                        "active audio device: %s" % (audio_device_value,
-                                                     s.get("playback-audio-device"),
-                                                     audio_device_value))
-            s.set("playback-audio-device", audio_device_value)
 
-            # Set libopenshot settings
-            lib_settings = openshot.Settings.Instance()
-            lib_settings.PLAYBACK_AUDIO_DEVICE_NAME = active_audio_device.get_name()
-            lib_settings.PLAYBACK_AUDIO_DEVICE_TYPE = active_audio_device.get_type()
+        # Applying these touches settings, project data and update listeners
+        # (which enable/disable menu actions), so it must run on the GUI thread.
+        self.audio_device_checked.emit({
+            "sample_rate": detected_sample_rate,
+            "device_name": active_audio_device.get_name(),
+            "device_type": active_audio_device.get_type(),
+        })
 
     @pyqtSlot()
     def Start(self):
@@ -353,7 +370,6 @@ class PlayerWorker(QObject):
             if self.player.Mode() != self.current_mode:
                 self.current_mode = self.player.Mode()
                 self.mode_changed.emit(self.current_mode)
-
             # wait for a small delay
             time.sleep(0.005)
             QCoreApplication.processEvents()
