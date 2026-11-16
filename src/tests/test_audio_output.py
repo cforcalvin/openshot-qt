@@ -31,9 +31,11 @@ from unittest.mock import Mock, patch
 
 from classes import audio_output
 from classes.audio_output import (
-    AudioOutputController, migrate_device_setting, parse_device_setting, format_device_setting)
+    AudioOutputController, migrate_device_setting, parse_device_setting, format_device_setting,
+    same_device)
 
 SPEAKERS = ("MacBook Air Speakers", "CoreAudio")
+SPEAKERS_SHORT = ("Speakers", "CoreAudio")
 AIRPODS = ("AirPods Pro", "CoreAudio")
 
 
@@ -60,6 +62,12 @@ class DeviceSettingTests(unittest.TestCase):
         self.assertEqual(parse_device_setting(None), ("", ""))
         self.assertEqual(format_device_setting(*AIRPODS), "AirPods Pro||CoreAudio")
         self.assertEqual(format_device_setting("", "CoreAudio"), "")
+
+    def test_short_coreaudio_name_matches_full_device(self):
+        self.assertTrue(same_device("MacBook Air Speakers", "Speakers"))
+        self.assertTrue(same_device("Speakers", "MacBook Air Speakers"))
+        self.assertFalse(same_device("AirPods Pro", "Speakers"))
+        self.assertFalse(same_device("USB Speakers", "MacBook Air Speakers"))
 
     def test_auto_saved_device_is_reset_once(self):
         settings = _Settings({"playback-audio-device": "MacBook Air Speakers||CoreAudio"})
@@ -138,9 +146,29 @@ class AudioOutputControllerTests(unittest.TestCase):
         self.controller.on_device_opened(*SPEAKERS)
         self.assertEqual(self.player.SetAudioDevice.call_count, 1)
 
-        # A change in outputs allows another attempt
-        self.controller.on_outputs_changed(_snapshot(SPEAKERS, SPEAKERS, AIRPODS, ("BlackHole 2ch", "CoreAudio")))
+        # Reordering or unrelated devices must not clear the failure
+        self.controller.on_outputs_changed(_snapshot(SPEAKERS, AIRPODS, SPEAKERS, ("BlackHole 2ch", "CoreAudio")))
+        self.assertEqual(self.player.SetAudioDevice.call_count, 1)
+
+        # Disconnect then reconnect the failed device allows another attempt
+        self.controller.on_outputs_changed(_snapshot(SPEAKERS, SPEAKERS))
+        self.controller.on_device_opened(*SPEAKERS)
+        self.controller.on_outputs_changed(_snapshot(SPEAKERS, SPEAKERS, AIRPODS))
         self.assertEqual(self.player.SetAudioDevice.call_count, 2)
+
+    def test_short_speaker_name_matches_preferred_speakers(self):
+        self.settings.set("playback-audio-device", "MacBook Air Speakers||CoreAudio")
+        self.controller.on_outputs_changed(_snapshot(SPEAKERS, SPEAKERS))
+        self.controller.on_device_opened(*SPEAKERS_SHORT)
+        self.player.SetAudioDevice.assert_not_called()
+
+    def test_system_default_accepts_short_open_name(self):
+        self.controller.on_outputs_changed(_snapshot(SPEAKERS, SPEAKERS))
+        self.controller.on_device_opened(*SPEAKERS_SHORT)
+        self.player.SetAudioDevice.assert_not_called()
+        # Default request that opens a short name must not thrash
+        self.controller.on_outputs_changed(_snapshot(SPEAKERS, SPEAKERS))
+        self.player.SetAudioDevice.assert_not_called()
 
     def test_nothing_happens_before_a_device_opens(self):
         self.controller.on_outputs_changed(_snapshot(AIRPODS, SPEAKERS, AIRPODS))

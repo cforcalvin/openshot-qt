@@ -51,7 +51,32 @@ def format_device_setting(name, device_type):
 
 
 def same_device(first, second):
-    return (first or "").strip().casefold() == (second or "").strip().casefold()
+    """Whether two device names refer to the same output.
+
+    CoreAudio/JUCE sometimes reports a short name ("Speakers") for the full
+    device ("MacBook Air Speakers"), so treat matching suffixes as the same.
+    """
+    a = (first or "").strip().casefold()
+    b = (second or "").strip().casefold()
+    if a == b:
+        return True
+    if not a or not b:
+        return False
+    return a.endswith(" " + b) or b.endswith(" " + a)
+
+
+def _normalize_snapshot(snapshot):
+    """Stable form for change detection (device list order from CoreAudio can flip)."""
+    default = snapshot.get("default") or ("", "")
+    outputs = tuple(sorted(
+        ((name or "", device_type or "") for name, device_type in (snapshot.get("outputs") or [])),
+        key=lambda item: (item[0].casefold(), item[1].casefold()),
+    ))
+    return (default[0] or "", default[1] or ""), outputs
+
+
+def _device_connected(name, outputs):
+    return any(same_device(name, output) for output, _ in (outputs or []))
 
 
 def migrate_device_setting(settings):
@@ -98,13 +123,15 @@ class AudioOutputMonitor(QObject):
             except Exception:
                 log.debug("Failed to poll audio outputs", exc_info=True)
                 snapshot = None
-            if snapshot is not None and snapshot != self._last:
-                self._last = snapshot
-                try:
-                    self.outputs_changed.emit(snapshot)
-                except RuntimeError:
-                    # QObject deleted during shutdown
-                    return
+            if snapshot is not None:
+                normalized = _normalize_snapshot(snapshot)
+                if normalized != self._last:
+                    self._last = normalized
+                    try:
+                        self.outputs_changed.emit(snapshot)
+                    except RuntimeError:
+                        # QObject deleted during shutdown
+                        return
             self._stop.wait(self._interval)
 
 
@@ -149,7 +176,7 @@ class AudioOutputController(QObject):
         return list(self.snapshot["outputs"])
 
     def is_connected(self, name):
-        return any(same_device(name, output) for output, _ in self.outputs())
+        return _device_connected(name, self.outputs())
 
     def target(self):
         """The device that should be open now, and how to request it from libopenshot
@@ -174,10 +201,15 @@ class AudioOutputController(QObject):
         first = self.active is None
         self.active = (name, device_type)
         requested, self._requested = self._requested, None
-        if requested and not same_device(requested[0], name):
-            # Don't keep retrying a device that won't open, until the outputs change
+        if requested and requested[0] and not same_device(requested[0], name):
+            # Don't keep retrying a device that won't open, until that device's
+            # connectivity actually changes (list reorder must not clear this).
             log.warning("Requested audio output %s, but %s opened", requested[0], name)
             self._failed = requested
+        elif requested and not requested[0]:
+            # Following the system default: accept whatever CoreAudio opened,
+            # even when getDefaultOutput()'s name disagrees (e.g. "Speakers").
+            self._failed = None
         self.active_device_changed.emit(name, device_type)
         if first:
             self.monitor.start()
@@ -185,8 +217,13 @@ class AudioOutputController(QObject):
 
     @pyqtSlot(object)
     def on_outputs_changed(self, snapshot):
+        previous = self.snapshot
         self.snapshot = snapshot
-        self._failed = None
+        if self._failed:
+            was = _device_connected(self._failed[0], (previous or {}).get("outputs"))
+            now = _device_connected(self._failed[0], snapshot.get("outputs"))
+            if was != now:
+                self._failed = None
         self.outputs_changed.emit(snapshot)
         self.reconcile()
 
@@ -195,7 +232,11 @@ class AudioOutputController(QObject):
         if self.active is None or self._requested is not None:
             return
         target, request = self.target()
-        if not target[0] or same_device(target[0], self.active[0]) or target == self._failed:
+        if not target[0]:
+            return
+        if same_device(target[0], self.active[0]):
+            return
+        if self._failed and same_device(target[0], self._failed[0]):
             return
         log.info("Switching audio output from %s to %s", self.active[0] or "(none)", target[0])
         self._requested = target
