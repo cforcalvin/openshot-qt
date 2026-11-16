@@ -14,14 +14,16 @@ from classes import info
 
 def notification_icon(window, name, theme=None):
     """Matching outline menu icons with each theme's foreground color."""
-    if name in ("tool-optimize-preview", "tool-profile"):
-        return QIcon(os.path.join(info.PATH, "themes", "cosmic", "images", name + ".svg"))
     theme_name = getattr(theme, "name", "")
     if not theme_name:
         background = window.palette().color(QPalette.Window)
         theme_name = "Retro" if background.lightness() >= 128 else "Cosmic Dusk"
+    if name in ("tool-optimize-preview", "tool-profile"):
+        folder = "studio" if theme_name == "Studio Dark" else "cosmic"
+        return QIcon(os.path.join(info.PATH, "themes", folder, "images", name + ".svg"))
     path = {
         "Cosmic Dusk": "cosmic/images/{}.svg",
+        "Studio Dark": "studio/images/{}.svg",
         "Humanity: Dark": "humanity/images/{}-dark.svg",
         "Retro": "humanity/images/{}-retro.svg",
     }.get(theme_name, "cosmic/images/{}.svg").format(name)
@@ -38,6 +40,12 @@ def banner_colors(window, theme=None, kind="update"):
                         text="#17665a", action="#155da6", close="#536579", hover="#d9f0e9")
         return dict(backdrop="#ededed", surface="#eef5fc", border="#b2c9e0", text="#155da6",
                     action="#155da6", close="#536579", hover="#dcebf9")
+    if name == "Studio Dark":
+        if kind == "feedback":
+            return dict(backdrop="#1C1C1E", surface="#2C2C2E", border="#3A3A3C",
+                        text="#EBEBF5", action="#409CFF", close="#AEAEB2", hover="#3A3A3C")
+        return dict(backdrop="#1C1C1E", surface="#2C2C2E", border="#3A3A3C", text="#EBEBF5",
+                    action="#409CFF", close="#AEAEB2", hover="#3A3A3C")
     if name == "Cosmic Dusk" or (not name and background.blue() > background.red() + 10):
         if kind == "feedback":
             return dict(backdrop="#192332", surface="#172d32", border="#386761",

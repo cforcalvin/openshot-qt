@@ -34,6 +34,7 @@ class ThemeName(Enum):
     RETRO = "Retro"
     HUMANITY_DARK = "Humanity: Dark"
     COSMIC = "Cosmic Dusk"
+    STUDIO = "Studio Dark"
 
     @staticmethod
     def get_sorted_theme_names():
@@ -79,6 +80,9 @@ class ThemeManager:
         elif theme_enum == ThemeName.COSMIC:
             from themes.cosmic.theme import CosmicTheme
             self.current_theme = CosmicTheme(self.app)
+        elif theme_enum == ThemeName.STUDIO:
+            from themes.studio.theme import StudioDarkTheme
+            self.current_theme = StudioDarkTheme(self.app)
 
         # Set name on theme instance
         self.current_theme.name = theme_enum.value

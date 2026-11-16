@@ -46,7 +46,7 @@ def verify():
         assert app.project.get("auto_optimize") is None
         controller.timer.stop()
         controller._offer()
-        for theme in ("Cosmic Dusk", "Humanity: Dark", "Retro"):
+        for theme in ("Cosmic Dusk", "Studio Dark", "Humanity: Dark", "Retro"):
             app.theme_manager.apply_theme(theme)
             app.processEvents()
             banner = window.notification_area.banners["auto-optimize"]

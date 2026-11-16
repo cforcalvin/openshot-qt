@@ -22,7 +22,7 @@ from windows.notifications import NotificationBanner, banner_colors, notificatio
 for kind in ('feedback', 'update'):
     banner = NotificationBanner(None, kind, 'Open', lambda: None, lambda: None,
                                 str, icon_name=kind)
-    for name in ('Cosmic Dusk', 'Humanity: Dark', 'Retro'):
+    for name in ('Cosmic Dusk', 'Studio Dark', 'Humanity: Dark', 'Retro'):
         theme = SimpleNamespace(name=name)
         colors = banner_colors(banner, theme, kind)
         banner.apply_colors(colors, theme)
@@ -103,7 +103,7 @@ def verify():
         assert actions[start + 1] is window.actionUpdate
         assert actions[start + 2].isSeparator()
         assert actions[start + 3] is window.actionAbout
-        for theme in ("Cosmic Dusk", "Humanity: Dark", "Retro"):
+        for theme in ("Cosmic Dusk", "Studio Dark", "Humanity: Dark", "Retro"):
             app.theme_manager.apply_theme(theme)
             app.processEvents()
             app.processEvents()

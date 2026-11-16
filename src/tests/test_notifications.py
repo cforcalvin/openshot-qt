@@ -159,7 +159,7 @@ class NotificationTests(unittest.TestCase):
         self.app.processEvents()
         self.app.processEvents()
         self.assertTrue(window.toolBarBreak(area.toolbar))
-        for theme in ("Cosmic Dusk", "Humanity: Dark", "Retro"):
+        for theme in ("Cosmic Dusk", "Studio Dark", "Humanity: Dark", "Retro"):
             area.apply_theme(SimpleNamespace(name=theme))
             for banner in area.banners.values():
                 colors = banner_colors(window, SimpleNamespace(name=theme), banner.icon_name)
@@ -181,7 +181,7 @@ class NotificationTests(unittest.TestCase):
             channels = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
                         for x in (c.redF(), c.greenF(), c.blueF())]
             return sum(a * b for a, b in zip(channels, (0.2126, 0.7152, 0.0722)))
-        for name in ("Cosmic Dusk", "Humanity: Dark", "Retro"):
+        for name in ("Cosmic Dusk", "Studio Dark", "Humanity: Dark", "Retro"):
             for kind in ("update", "feedback"):
                 colors = banner_colors(self.make_window(), SimpleNamespace(name=name), kind)
                 for role in ("text", "action", "close"):
